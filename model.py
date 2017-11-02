@@ -1,7 +1,7 @@
 from utils import *
 from config import SAVE_DIR, VAEGConfig
 from datetime import datetime
-from ops import print_vars
+#from ops import print_vars
 from cell import VAEGCell
 
 import tensorflow as tf
@@ -19,19 +19,21 @@ class VAEG(VAEGConfig):
         self.input_dim = num_nodes
         self.dropout = placeholders['dropout']
         self.output_data = placeholders['output']
-        self.edges = placeholders['edges']
-        self.non_edges = placeholders['non_edges']
+        self.k = placeholders['k']
+        self.i = placeholders['i']
+        self.edges, self.non_edges = get_edges(self.adj)
+
 
         #logger.info("Building model starts...")
-        def loglikelihood(prob_dict):
+        def neg_loglikelihood(prob_dict):
             '''
             negative loglikelihood of the edges
             '''
-            denom_log = 0
+            ll = 0
             with tf.variable_scope('NLL'):
                 for (u,v) in self.edges:
-                    denom_log += tf.log(prob_dict[u][v])
-            return denom_log
+                    ll += tf.log(prob_dict[u][v])
+            return (-ll)
 
         def kl_gaussian(mu_1, sigma_1, mu_2, sigma_2):
             '''
@@ -45,17 +47,17 @@ class VAEG(VAEGConfig):
 
         def get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, prior_mu, prior_sigma)  # KL_divergence loss
-            likelihood_loss = loglikelihood(dec_out)  # Cross entropy loss
+            likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
             return tf.reduce_mean(kl_loss + likelihood_loss)
 
 
-        logger.info("Building VAEGCell starts...")
+        #logger.info("Building VAEGCell starts...")
         self.cell = VAEGCell(self.adj, self.features, self.rnn_size, self.latent_size)
-        logger.info("Building VAEGCell done.")
+        #logger.info("Building VAEGCell done.")
 
 
         with tf.variable_scope("inputs"):
-            inputs = (self.adj, self.features, k, i)
+            inputs = (self.adj, self.features, self.k, self.i)
 
         # [batch_size* seq_length, chunk_samples*2]
         #self.target = tf.reshape(self.target_data, [-1, 2 * self.chunk_samples])
@@ -66,14 +68,15 @@ class VAEG(VAEGConfig):
         outputs_reshape = []
         names = ["enc_mu", "enc_sigma", "dec_out", "prior_mu", "prior_sigma"]
 
-        for n, name in enumerate(names):
-            with tf.variable_scope(name):
-                x = tf.stack([o[n] for o in outputs])  # [seq_length, batch_size, chunk_samples]
-                x = tf.transpose(x, [1, 0, 2])  # [batch_size, seq_length, chunk_samples]
-                x = tf.reshape(x, [self.batch_size * self.seq_length, -1])  # [batch_size x seq_length, chunk_samples]
-                outputs_reshape.append(x)
+        # for n, name in enumerate(names):
+        #     with tf.variable_scope(name):
+        #         x = tf.stack([o[n] for o in outputs])  # [seq_length, batch_size, chunk_samples]
+        #         x = tf.transpose(x, [1, 0, 2])  # [batch_size, seq_length, chunk_samples]
+        #         x = tf.reshape(x, [self.batch_size * self.seq_length, -1])  # [batch_size x seq_length, chunk_samples]
+        #         outputs_reshape.append(x)
         # tuple*[batch_size x seq_length, chunk_samples]
-        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = outputs_reshape
+
+        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = outputs
         self.prob = dec_out
         #self.sigma = dec_sigma
 
@@ -83,37 +86,11 @@ class VAEG(VAEGConfig):
         print_vars("trainable_variables")
         self.lr = tf.Variable(self.lr, trainable=False)
         self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost)
-        logger.info("Building model done.")
+        #logger.info("Building model done.")
 
         self.sess = tf.Session()
 
-    def next_batch(self):
-        '''
-        3D signal
-            [batch_axis, time_axis, chunk_axis]
-        = common noise + noise + sin(time_axis[:] + time_offset)
 
-        half of the chunk_axis are all zeros
-
-        Return:
-            x, y
-            x - 3D ndarray
-                [self.batch_size, self.seq_length, 2*self.chunk_samples]
-            y - 3D ndarray
-                [self.batch_size, self.seq_length, 2*self.chunk_samples]
-
-        '''
-        t_offset = np.random.randn(self.batch_size, 1, (2 * self.chunk_samples))
-        mixed_noise = np.random.randn(self.batch_size, self.seq_length, (2 * self.chunk_samples)) * 0.01
-
-        x = np.random.randn(self.batch_size, self.seq_length, (2 * self.chunk_samples)) * 0.1 + mixed_noise + np.sin(
-            2 * np.pi * (np.arange(self.seq_length)[np.newaxis, :, np.newaxis] / 10. + t_offset))
-        y = np.random.randn(self.batch_size, self.seq_length, (2 * self.chunk_samples)) * 0.1 + mixed_noise + np.sin(
-            2 * np.pi * (np.arange(1, self.seq_length + 1)[np.newaxis, :, np.newaxis] / 10. + t_offset))
-
-        y[:, :, self.chunk_samples:] = 0.
-        x[:, :, self.chunk_samples:] = 0.
-        return x, y
 
     def initialize(self):
         logger.info("Initialization of parameters")
@@ -135,7 +112,7 @@ class VAEG(VAEGConfig):
             print("Load the model from %s" % ckpt.model_checkpoint_path)
 
         iteration = 0
-        for i in range(self.random_walk):
+        for i in range(self.k):
             for epoch in range(self.num_epochs):
             # Learning rate decay
                 self.sess.run(tf.assign(self.lr, self.lr * (self.decay_rate ** epoch)))

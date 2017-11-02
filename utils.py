@@ -72,7 +72,8 @@ def get_basis(mat):
 def create_dir(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
-
+def get_edges(adj):
+    return
 def pickle_load(path):
     '''Load the picke data from path'''
     with open(path, 'rb') as f:

@@ -19,8 +19,10 @@ FLAGS = None
 placeholders = {
         'features': tf.sparse_placeholder(tf.float32),
         'adj': tf.sparse_placeholder(tf.float32),
-        'adj_orig': tf.sparse_placeholder(tf.float32),
-        'dropout': tf.placeholder_with_default(0., shape=())
+        #'adj_orig': tf.sparse_placeholder(tf.float32),
+        'dropout': tf.placeholder_with_default(0., shape=()),
+        'edges': tf.placeholder((tf.int32, tf.int32)),
+        'non_edges': tf.placeholder((tf.int32, tf.int32))
     }
 def add_arguments(parser):
     parser.register("type", "bool", lambda v: v.lower() == "true")
