@@ -1,18 +1,20 @@
-from layer import fc_layer, get_shape, print_vars
+from layer import *
 import tensorflow as tf
 import numpy as np
 from utils import *
+from math import exp
 
 class VAEGCell(tf.nn.rnn_cell.RNNCell):
     """Variational Auto Encoder cell."""
 
-    def __init__(self, x_dim, h_dim, z_dim = 100):
+    def __init__(self, adj, x_dim, h_dim, z_dim = 100):
         '''
         Args:
             x_dim - chunk_samples
             h_dim - rnn_size
             z_dim - latent_size
         '''
+        self.edges = tf.reduce_sum(adj)
         self.n_h = h_dim
         self.n_x = x_dim
         self.n_z = z_dim
@@ -31,7 +33,7 @@ class VAEGCell(tf.nn.rnn_cell.RNNCell):
     def output_size(self):
         return self.n_h
 
-    def __call__(self, c_x, A, D, state, scope=None):
+    def __call__(self, input, state,scope=None):
         '''
 		Args:
 			x - input 2D tensor [batch_size x 2*self.chunk_samples]
@@ -40,31 +42,45 @@ class VAEGCell(tf.nn.rnn_cell.RNNCell):
 			scope - string
 				defaults to be None
     	'''
+        adj,feature ,k, i = input
+        n = adj[0].shape
         with tf.variable_scope(scope or type(self).__name__):
-            h, c = state
+            c_x = input_layer(adj, feature, output_size, k, i, activation = None, batch_norm = False, istrain = False, scope = None)
+            #h, c = state
             with tf.variable_scope("Prior"):
                 #prior_hidden = fc_layer(h, self.n_prior_hidden, activation = tf.nn.relu, scope = "hidden")
                 prior_mu = tf.get_variable(name="prior_mu", shape=[self.n_x,1]) #fc_layer(prior_hidden, self.n_z, scope = "mu")
                 prior_sigma = tf.get_variable(name="prior_sigma", shape=[self.n_x,1]) #fc_layer(prior_hidden, self.n_z, activation = tf.nn.softplus, scope = "sigma")# >=0
 
-            cx_1 = fc_layer(tf.matmul(c_x, get_basis(A - D)), self.n_x_1, activation = tf.nn.relu, scope = "phi_C")# >=0
+            cx_1 = input_layer(tf.matmul(c_x, get_basis(adj)), self.n_x_1, scope = "phi_C")# >=0
 
             with tf.variable_scope("Encoder"):
-                enc_hidden = fc_layer(tf.concat(values=(cx_1, cx), axis=1), self.n_enc_hidden, activation = tf.nn.relu, scope = "hidden")
+                enc_hidden = fc_layer(tf.concat(values=(cx_1, c_x), axis=1), self.n_enc_hidden, activation = tf.nn.relu, scope = "hidden")
                 enc_mu = fc_layer(enc_hidden, self.n_z, scope = 'mu')
                 enc_sigma = fc_layer(enc_hidden, self.n_z, activation = tf.nn.softplus, scope = 'sigma')
 
             # Random sampling ~ N(0, 1)
-            eps = tf.random_normal((get_shape(x)[0], self.n_z), 0.0, 1.0, dtype=tf.float32)
+            eps = tf.random_normal((n, self.n_z), 0.0, 1.0, dtype=tf.float32)
             # z = mu + sigma*epsilon, latent variable from reparametrization trick
             z = tf.add(enc_mu, tf.multiply(enc_sigma, eps))
             #z_1 = fc_layer(z, self.n_z_1, activation = tf.nn.relu, scope = "phi_z")
 
             with tf.variable_scope("Decoder"):
-                dec_hidden = fc_layer(tf.concat(values=(z, z), axis=1), self.n_dec_hidden, activation = tf.nn.relu, scope = "hidden")
-                dec_prob = fc_layer(dec_hidden, self.n_x, scope = "mu")
+                sum_negclass = 0
+                dec_out = tf.get_variable(name="dec_out", shape=[self.n_x,1]) #fc_layer(prior_hidden, self.n_z, scope = "mu")
+                #dec_in = tf.get_variable(name="dec_out",
+                #                          shape=[self.n_x, 1])  # fc_layer(prior_hidden, self.n_z, scope = "mu")
+                # for i in range(n):
+                #     for j in range(n):
+                #         dec_in[i][j] = tf.concat(values=(z[i], z[j]))
+                # dec_out = fc_layer(tf.concat(dec_in, self.n_dec_hidden, activation = tf.nn.relu, scope = "hidden"))
+                for (u,v) in self.non_edges:
+                     sum_negclass += exp(fc_layer(tf.concat(values=(z[u], z[v]), axis=1), self.n_dec_hidden, activation = tf.nn.relu, scope = "hidden"))
+                for (u,v) in self.edges:
+                     dec = fc_layer(tf.concat(values=(z[u], z[v]), axis=1), self.n_dec_hidden, activation = tf.nn.relu, scope = "hidden")
+                     dec_out[u][v] = exp(dec) / (exp(dec) + sum_negclass)
                 #dec_sigma = fc_layer(dec_hidden, self.n_x, activation = tf.nn.softplus, scope = "sigma")
 
-            output, next_state = self.lstm(tf.concat(values=(x_1, z_1), axis=1), state)
+            #output, next_state = self.lstm(tf.concat(values=(x_1, z_1), axis=1), state)
 
-        return (enc_mu, enc_sigma, dec_prob, prior_mu, prior_sigma), next_state
+        return (enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma)

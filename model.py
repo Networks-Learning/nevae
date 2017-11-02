@@ -1,4 +1,4 @@
-from utils import create_dir, pickle_save
+from utils import *
 from config import SAVE_DIR, VAEGConfig
 from datetime import datetime
 from ops import print_vars
@@ -18,20 +18,20 @@ class VAEG(VAEGConfig):
         self.features_dim = num_features
         self.input_dim = num_nodes
         self.dropout = placeholders['dropout']
-        #logger.info("Building model starts...")
-        def crossentropyloss(adj_pred, adj_original):
-            '''
-            crossentropy loss of the predicted adjacency and the original adjacency matrix
-            '''
-            pos_weight = float(adj_pred.shape[0] * adj_pred.shape[0] - adj_pred.sum()) / adj_pred.sum()
-            norm = adj_pred.shape[0] * adj_pred.shape[0] / float(
-                (adj_pred.shape[0] * adj_pred.shape[0] - adj_pred.sum()) * 2)
-            with tf.variable_scope('CR_EN'):
-                loss = norm * tf.reduce_mean(
-                    tf.nn.weighted_cross_entropy_with_logits(logits=adj_pred, targets=adj_original,
-                                                             pos_weight=pos_weight))
+        self.output_data = placeholders['output']
+        self.edges = placeholders['edges']
+        self.non_edges = placeholders['non_edges']
 
-            return loss
+        #logger.info("Building model starts...")
+        def loglikelihood(prob_dict):
+            '''
+            negative loglikelihood of the edges
+            '''
+            denom_log = 0
+            with tf.variable_scope('NLL'):
+                for (u,v) in self.edges:
+                    denom_log += tf.log(prob_dict[u][v])
+            return denom_log
 
         def kl_gaussian(mu_1, sigma_1, mu_2, sigma_2):
             '''
@@ -43,44 +43,28 @@ class VAEG(VAEGConfig):
                     - 2 * tf.log(tf.maximum(1e-9, sigma_1), name='log_sigma_1')
                     + (tf.square(sigma_1) + tf.square(mu_1 - mu_2)) / tf.maximum(1e-9, (tf.square(sigma_2))) - 1), 1)
 
-        def get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, y, x):
+        def get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, prior_mu, prior_sigma)  # KL_divergence loss
-            likelihood_loss = crossentropyloss(y, x)  # Cross entropy loss
+            likelihood_loss = loglikelihood(dec_out)  # Cross entropy loss
             return tf.reduce_mean(kl_loss + likelihood_loss)
 
+
         logger.info("Building VAEGCell starts...")
-        self.cell = VAEGCell(self.chunk_samples, self.rnn_size, self.latent_size)
+        self.cell = VAEGCell(self.adj, self.features, self.rnn_size, self.latent_size)
         logger.info("Building VAEGCell done.")
 
-        # The adjacency matrix
-        self.input_connectivity = tf.placeholder(dtype=tf.float32,
-                                         shape=[self.batch_size, self.seq_length, 2 * self.chunk_samples],
-                                         name='input_connectivity')
-        # The feature vector
-        self.input_features = tf.placeholder(dtype=tf.float32,
-                                         shape=[self.batch_size, self.seq_length, 2 * self.chunk_samples],
-                                         name='input_features')
-        # Output or predicted vector[batch_size, seq_length, chunk_samples*2]
-        self.output_data = tf.placeholder(dtype=tf.float32,
-                                          shape=[self.batch_size, self.seq_length, 2 * self.chunk_samples],
-                                          name='target_data')
-        # [batch_size, rnn_size]
-        self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
 
         with tf.variable_scope("inputs"):
-            inputs = tf.transpose(self.input_data, [1, 0, 2])  # [seq_length, batch_size, 2*chunk_samples]
-            inputs = tf.reshape(inputs, [-1, 2 * self.chunk_samples])  # [seq_length*batch_size, 2*chunk_samples]
-            inputs = tf.split(axis=0, num_or_size_splits=self.seq_length,
-                              value=inputs)  # seq_length * [batch_size, 2*chunk_samples]
+            inputs = (self.adj, self.features, k, i)
 
         # [batch_size* seq_length, chunk_samples*2]
-        self.target = tf.reshape(self.target_data, [-1, 2 * self.chunk_samples])
+        #self.target = tf.reshape(self.target_data, [-1, 2 * self.chunk_samples])
 
         outputs, last_state = tf.contrib.rnn.static_rnn(self.cell, inputs,
                                                         initial_state=(self.initial_state_c, self.initial_state_h))
         # outputs seq_length*tuple*[batch_size, chunk_samples]
         outputs_reshape = []
-        names = ["enc_mu", "enc_sigma", "dec_mu", "dec_sigma", "prior_mu", "prior_sigma"]
+        names = ["enc_mu", "enc_sigma", "dec_out", "prior_mu", "prior_sigma"]
 
         for n, name in enumerate(names):
             with tf.variable_scope(name):
@@ -89,12 +73,12 @@ class VAEG(VAEGConfig):
                 x = tf.reshape(x, [self.batch_size * self.seq_length, -1])  # [batch_size x seq_length, chunk_samples]
                 outputs_reshape.append(x)
         # tuple*[batch_size x seq_length, chunk_samples]
-        enc_mu, enc_sigma, dec_mu, dec_sigma, prior_mu, prior_sigma = outputs_reshape
-        self.mu = dec_mu
-        self.sigma = dec_sigma
+        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = outputs_reshape
+        self.prob = dec_out
+        #self.sigma = dec_sigma
 
         self.final_state_c, self.final_state_h = last_state
-        self.cost = get_lossfunc(enc_mu, enc_sigma, dec_mu, dec_sigma, prior_mu, prior_sigma, self.target)
+        self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
 
         print_vars("trainable_variables")
         self.lr = tf.Variable(self.lr, trainable=False)
@@ -151,11 +135,17 @@ class VAEG(VAEGConfig):
             print("Load the model from %s" % ckpt.model_checkpoint_path)
 
         iteration = 0
-        for epoch in range(self.num_epochs):
+        for i in range(self.random_walk):
+            for epoch in range(self.num_epochs):
             # Learning rate decay
-            self.sess.run(tf.assign(self.lr, self.lr * (self.decay_rate ** epoch)))
+                self.sess.run(tf.assign(self.lr, self.lr * (self.decay_rate ** epoch)))
 
-            for batch in range(self.n_batches):
+                feed_dict = construct_feed_dict(self.adj, self.feature, placeholders)
+                feed_dict.update({placeholders['dropout']: FLAGS.dropout})
+                outs = sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
+                train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
+
+                for batch in range(self.n_batches):
                 x, y = self.next_batch()
                 feed_dict = {model.input_data: x, model.target_data: y}
                 train_loss, _, sigma = self.sess.run([self.cost, self.train_op, self.sigma], feed_dict=feed_dict)

@@ -3,11 +3,24 @@ import pickle
 import numpy as np
 from numpy.linalg import svd, qr
 
+def degree(A):
+    return np.zeros()
+
+
+def construct_feed_dict(adj_normalized, adj, features, placeholders):
+    # construct feed dictionary
+    feed_dict = dict()
+    feed_dict.update({placeholders['features']: features})
+    feed_dict.update({placeholders['adj']: adj_normalized})
+    feed_dict.update({placeholders['adj_orig']: adj})
+    return feed_dict
+
+
 def get_shape(tensor):
     '''return the shape of tensor as list'''
     return tensor.get_shape().as_list()
 
-def basis(A, atol=1e-13, rtol=0):
+def basis(adj, atol=1e-13, rtol=0):
     """Estimate the basis of a matrix.
 
 
@@ -37,6 +50,8 @@ def basis(A, atol=1e-13, rtol=0):
     --------
     numpy.linalg.matrix_rank
     """
+
+    A = degree(adj) - adj
 
     A = np.atleast_2d(A)
     s = svd(A, compute_uv=False)
