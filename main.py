@@ -29,6 +29,8 @@ def add_arguments(parser):
 
     # network
     parser.add_argument("--num_epochs", type=int, default=32, help="Number of epochs")
+    parser.add_argument("--learning_rate", type=float, default=0.00005, help="learning rate")
+    parser.add_argument("--log_every", type=int, default=5, help="write the log in how many iterations")
     parser.add_argument("--graph_file", type=str, default=None,
                         help="The file where the graph structure is saved")
     parser.add_argument("--out_dir", type=str, default=None,
@@ -40,6 +42,7 @@ def create_hparams(flags):
       # Data
       graph_file=flags.graph_file,
       out_dir=flags.out_dir,
+      learning_rate=flags.learning_rate,
       #training
       num_epochs=flags.num_epochs
       )

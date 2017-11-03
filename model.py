@@ -10,6 +10,10 @@ import logging
 import pickle
 import os
 
+logging.basicConfig(format="[%(asctime)s] %(message)s", datefmt="%m%d %H:%M:%S")
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 
 class VAEG(VAEGConfig):
     def __init__(self, placeholders, num_nodes, num_features, istest=False):
@@ -21,6 +25,7 @@ class VAEG(VAEGConfig):
         self.output_data = placeholders['output']
         self.k = placeholders['k']
         self.i = placeholders['i']
+        self.lr = placeholders['lr']
         self.edges, self.non_edges = get_edges(self.adj)
 
 
@@ -55,9 +60,8 @@ class VAEG(VAEGConfig):
         self.cell = VAEGCell(self.adj, self.features, self.rnn_size, self.latent_size)
         #logger.info("Building VAEGCell done.")
 
-
         with tf.variable_scope("inputs"):
-            inputs = (self.adj, self.features, self.k, self.i)
+            inputs = [self.adj, self.features, self.k, self.i]
 
         # [batch_size* seq_length, chunk_samples*2]
         #self.target = tf.reshape(self.target_data, [-1, 2 * self.chunk_samples])
@@ -65,8 +69,8 @@ class VAEG(VAEGConfig):
         outputs, last_state = tf.contrib.rnn.static_rnn(self.cell, inputs,
                                                         initial_state=(self.initial_state_c, self.initial_state_h))
         # outputs seq_length*tuple*[batch_size, chunk_samples]
-        outputs_reshape = []
-        names = ["enc_mu", "enc_sigma", "dec_out", "prior_mu", "prior_sigma"]
+        # outputs_reshape = []
+        # names = ["enc_mu", "enc_sigma", "dec_out", "prior_mu", "prior_sigma"]
 
         # for n, name in enumerate(names):
         #     with tf.variable_scope(name):
@@ -102,7 +106,7 @@ class VAEG(VAEGConfig):
         print("Load the model from {}".format(ckpt.model_checkpoint_path))
         saver.restore(self.sess, ckpt.model_checkpoint_path)
 
-    def train(self):
+    def train(self,placeholders):
         create_dir(SAVE_DIR)
         ckpt = tf.train.get_checkpoint_state(SAVE_DIR)
         saver = tf.train.Saver(tf.global_variables())
@@ -118,22 +122,17 @@ class VAEG(VAEGConfig):
                 self.sess.run(tf.assign(self.lr, self.lr * (self.decay_rate ** epoch)))
 
                 feed_dict = construct_feed_dict(self.adj, self.feature, placeholders)
-                feed_dict.update({placeholders['dropout']: FLAGS.dropout})
-                outs = sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
-                train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
-
-                for batch in range(self.n_batches):
-                x, y = self.next_batch()
-                feed_dict = {model.input_data: x, model.target_data: y}
-                train_loss, _, sigma = self.sess.run([self.cost, self.train_op, self.sigma], feed_dict=feed_dict)
+                #feed_dict.update({placeholders['dropout']: FLAGS.dropout})
+                #outs = self.sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
+                #train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
+                train_loss, _ = self.sess.run([self.cost, self.train_op], feed_dict=feed_dict)
 
                 iteration += 1
                 if iteration % self.log_every == 0 and iteration > 0:
-                    print("{}/{}(epoch {}), train_loss = {:.6f}, std = {:.3f}".format(iteration,
+                    print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration,
                                                                                       self.num_epochs * self.n_batches,
                                                                                       epoch + 1,
-                                                                                      self.chunk_samples * train_loss,
-                                                                                      sigma.mean(axis=0).mean(axis=0)))
+                                                                                      train_loss))
                     checkpoint_path = os.path.join(SAVE_DIR, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))
