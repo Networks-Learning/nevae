@@ -9,12 +9,15 @@ def degree(A):
     return np.zeros()
 
 
-def construct_feed_dict(adj_normalized, adj, features, placeholders):
+def construct_feed_dict(k,i,lr,dropout, placeholders):
     # construct feed dictionary
     feed_dict = dict()
-    feed_dict.update({placeholders['features']: features})
-    feed_dict.update({placeholders['adj']: adj_normalized})
-    feed_dict.update({placeholders['adj_orig']: adj})
+    #feed_dict.update({placeholders['features']: features})
+    #feed_dict.update({placeholders['adj']: adj_normalized})
+    feed_dict.update({placeholders['k']: k})
+    feed_dict.update({placeholders['i']: i})
+    feed_dict.update({placeholders['lr']: lr})
+    feed_dict.update({placeholders['dropout']: dropout})
     return feed_dict
 
 

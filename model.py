@@ -113,7 +113,14 @@ class VAEG(VAEGConfig):
         print("Load the model from {}".format(ckpt.model_checkpoint_path))
         saver.restore(self.sess, ckpt.model_checkpoint_path)
 
-    def train(self,placeholders, savedir):
+    def train(self,placeholders, hparams):
+        savedir = hparams.out_dir
+        k = hparams.k
+        lr = hparams.learning_rate
+        dr = hparams.dropout_rate
+
+        # training
+        num_epochs = hparams.num_epochs
         create_dir(savedir)
         ckpt = tf.train.get_checkpoint_state(savedir)
         saver = tf.train.Saver(tf.global_variables())
@@ -123,12 +130,12 @@ class VAEG(VAEGConfig):
             print("Load the model from %s" % ckpt.model_checkpoint_path)
 
         iteration = 0
-        for i in range(self.k):
-            for epoch in range(self.num_epochs):
+        for i in range(k):
+            for epoch in range(num_epochs):
             # Learning rate decay
-                self.sess.run(tf.assign(self.lr, self.lr * (self.decay_rate ** epoch)))
+                self.sess.run(tf.assign(lr, lr * (dr ** epoch)))
 
-                feed_dict = construct_feed_dict(self.adj, self.feature, placeholders)
+                feed_dict = construct_feed_dict( k,i, lr, dr, placeholders)
                 #feed_dict.update({placeholders['dropout']: FLAGS.dropout})
                 #outs = self.sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
                 #train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
