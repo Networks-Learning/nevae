@@ -2,8 +2,8 @@ import tensorflow as tf
 from utils import *
 
 def input_layer(adj, feature, k, i, activation = None, batch_norm = False, istrain = False, scope = None):
-    w_in = tf.variable(name="w_in", shape=[k,get_shape(feature)[1], get_shape(feature)[1]], initializer=tf.contrib.layers.xavier_initializer())
-    c_mat = tf.variable(name="C", shape=[k, get_shape(adj)[0], get_shape(feature)[1]], initializer=tf.contrib.layers.xavier_initializer())
+    w_in = tf.get_variable(name="w_in", shape=[k,get_shape(feature)[1], get_shape(feature)[1]], initializer=tf.contrib.layers.xavier_initializer())
+    c_mat = tf.get_variable(name="C", shape=[k, get_shape(adj)[0], get_shape(feature)[1]], initializer=tf.contrib.layers.xavier_initializer())
     if i > 0:
         c_mat[i] = tf.add(tf.transpose(tf.matmul(w_in[i], tf.transpose(feature)), perm=[0,2,1]),tf.matmul(adj, c_mat[i-1]))
     else:
