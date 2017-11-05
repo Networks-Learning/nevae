@@ -16,17 +16,20 @@ logger.setLevel(logging.DEBUG)
 
 
 class VAEG(VAEGConfig):
-    def __init__(self, placeholders, num_nodes, num_features, istest=False):
+    def __init__(self, placeholders, num_nodes, num_features, edges, non_edges, istest=False):
         self.adj = placeholders['adj']
         self.features = placeholders['features']
         self.features_dim = num_features
         self.input_dim = num_nodes
         self.dropout = placeholders['dropout']
-        self.output_data = placeholders['output']
+        #self.output_data = placeholders['output']
         self.k = placeholders['k']
         self.i = placeholders['i']
         self.lr = placeholders['lr']
-        self.edges, self.non_edges = get_edges(self.adj)
+        self.edges, self.non_edges = edges, non_edges 
+        self.rnn_size = 3 # num of hidden states in RNN
+        self.latent_size = 3 # size of latent space
+        self.batch_size = 1	
 
 
         #logger.info("Building model starts...")
@@ -57,17 +60,18 @@ class VAEG(VAEGConfig):
 
 
         #logger.info("Building VAEGCell starts...")
-        self.cell = VAEGCell(self.adj, self.features, self.rnn_size, self.latent_size)
+        self.cell = VAEGCell(self.adj, self.features,self.edges, self.non_edges, self.rnn_size, self.latent_size)
         #logger.info("Building VAEGCell done.")
 
         with tf.variable_scope("inputs"):
-            inputs = [self.adj, self.features, self.k, self.i]
+            inputs = self.i 
+        #[self.adj, self.features, self.k, self.i]
 
         # [batch_size* seq_length, chunk_samples*2]
         #self.target = tf.reshape(self.target_data, [-1, 2 * self.chunk_samples])
-
-        outputs, last_state = tf.contrib.rnn.static_rnn(self.cell, inputs,
-                                                        initial_state=(self.initial_state_c, self.initial_state_h))
+	self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
+        outputs, last_state = tf.contrib.rnn.static_rnn(self.cell, inputs)
+        #initial_state=(self.initial_state_c, self.initial_state_h))
         # outputs seq_length*tuple*[batch_size, chunk_samples]
         # outputs_reshape = []
         # names = ["enc_mu", "enc_sigma", "dec_out", "prior_mu", "prior_sigma"]

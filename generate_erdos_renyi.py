@@ -19,11 +19,11 @@ def random_walk(G, seed, k):
 		
 def create_graph(n,p):
 	G = nx.erdos_renyi_graph(n, p)
-	nx.draw_networkx(G, with_labels= True)
+	#nx.draw_networkx(G, with_labels= True)
 	print G.nodes()
 	print G.neighbors(0)
-	plt.axis('off')
-	plt.show()
+	#plt.axis('off')
+	#plt.show()
 	return G
 
 def get_params():
@@ -41,8 +41,12 @@ def get_params():
 if __name__ == "__main__":
 	params = get_params()
 	G = create_graph(params.n, params.p)
-        for n in G.nodes():	
-		print n,random_walk(G, n, params.k)
+	A = nx.adjacency_matrix(G)
+	nx.write_edgelist(G, "test.edgelist")
+	#print A
+	
+        #for n in G.nodes():	
+	#	print n,random_walk(G, n, params.k)
 
 	
 

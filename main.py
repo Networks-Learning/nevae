@@ -1,4 +1,4 @@
-from utils import create_dir, pickle_save, print_vars, load_data
+from utils import create_dir, pickle_save, print_vars, load_data, get_shape
 from config import SAVE_DIR, VAEGConfig
 from datetime import datetime
 from cell import VAEGCell
@@ -17,12 +17,15 @@ logger.setLevel(logging.DEBUG)
 
 FLAGS = None
 placeholders = {
-        'features': tf.sparse_placeholder(tf.float32),
-        'adj': tf.sparse_placeholder(tf.float32),
+        'features': tf.placeholder(tf.float32),
+        'adj': tf.placeholder(tf.float32),
         #'adj_orig': tf.sparse_placeholder(tf.float32),
         'dropout': tf.placeholder_with_default(0., shape=()),
-        'edges': tf.placeholder((tf.int32, tf.int32)),
-        'non_edges': tf.placeholder((tf.int32, tf.int32))
+	'lr': tf.sparse_placeholder(tf.float32),
+	'k': tf.sparse_placeholder(tf.float32),
+	'i': tf.sparse_placeholder(tf.float32)
+        #'edges': tf.placeholder((tf.int32, tf.int32)),
+        #'non_edges': tf.placeholder((tf.int32, tf.int32))
     }
 def add_arguments(parser):
     parser.register("type", "bool", lambda v: v.lower() == "true")
@@ -52,15 +55,17 @@ if __name__ == '__main__':
     add_arguments(nmt_parser)
     FLAGS, unparsed = nmt_parser.parse_known_args()
     hparams = create_hparams(FLAGS)
-
     # loading the data from a file
-    adj, features = load_data(hparams.graph_file)
-    num_nodes = adj[0].shape
-    num_features = features[0].shape
+    adj, features, edges, non_edges = load_data(hparams.graph_file)
+    #print adj
+    #print features
+    num_nodes = get_shape(adj)[0]
+    num_features = get_shape(features)[1]
 
-    model = VAEG(placeholders, num_nodes, num_features)
-    model.initialize()
-    model.train()
+    print num_nodes, num_features
+    model = VAEG(placeholders, num_nodes, num_features, edges, non_edges)
+    #model.initialize()
+    #model.train()
     '''
     Test code
     model2 = VRNN(True)

@@ -1,6 +1,8 @@
 import os
 import pickle
 import numpy as np
+import networkx as nx
+import tensorflow as tf
 from numpy.linalg import svd, qr
 
 def degree(A):
@@ -73,6 +75,7 @@ def create_dir(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 def get_edges(adj):
+    G.edges()
     return
 def pickle_load(path):
     '''Load the picke data from path'''
@@ -80,7 +83,16 @@ def pickle_load(path):
         loaded_pickle = pickle.load(f)
     return loaded_pickle
 def load_data(filename):
-    return
+    G=nx.read_edgelist(filename)
+    n = G.number_of_nodes() 
+    degreemat = np.zeros((n,n), dtype=np.int)
+    edges = G.edges()
+    GC=nx.complete_graph(n)
+    non_edges = list(set(GC.edges()) - set(edges))
+    for u in G.nodes():
+	degreemat[int(u)][int(u)] = G.degree(u)
+    return (tf.convert_to_tensor(nx.adjacency_matrix(G).todense()), tf.convert_to_tensor(degreemat), edges, non_edges)
+
 def pickle_save(content, path):
     '''Save the content on the path'''
     with open(path, 'wb') as f:

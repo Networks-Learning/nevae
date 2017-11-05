@@ -7,7 +7,7 @@ from math import exp
 class VAEGCell(tf.nn.rnn_cell.RNNCell):
     """Variational Auto Encoder cell."""
 
-    def __init__(self, adj, features, x_dim, h_dim, z_dim = 100):
+    def __init__(self, adj, features, edges, non_edges, x_dim, h_dim, z_dim = 100):
         '''
         Args:
             x_dim - chunk_samples
@@ -16,7 +16,8 @@ class VAEGCell(tf.nn.rnn_cell.RNNCell):
         '''
         self.adj = adj
         self.features = features
-        self.edges = tf.reduce_sum(adj)
+        self.edges = edges
+	self.non_edges = non_edges
         self.n_h = h_dim
         self.n_x = x_dim
         self.n_z = z_dim
