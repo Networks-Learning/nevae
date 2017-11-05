@@ -9,7 +9,7 @@ from math import exp
 class VAEGCell(object):
     """Variational Auto Encoder cell."""
 
-    def __init__(self, adj, features, edges, non_edges, x_dim, h_dim, z_dim = 100):
+    def __init__(self, adj, features, edges, non_edges):
         '''
         Args:
             x_dim - chunk_samples
@@ -96,6 +96,6 @@ class VAEGCell(object):
 
         return (enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma)
 
-    def call(self):
+    def call(self,k,i):
         #with tf.variable_scope(self.name):
-            return self.__call__()
+            return self.__call__(k,i)

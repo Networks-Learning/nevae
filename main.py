@@ -17,15 +17,15 @@ logger.setLevel(logging.DEBUG)
 
 FLAGS = None
 placeholders = {
-        'features': tf.placeholder(tf.float32),
-        'adj': tf.placeholder(tf.float32),
-        #'adj_orig': tf.sparse_placeholder(tf.float32),
-        'dropout': tf.placeholder_with_default(0., shape=()),
-	'lr': tf.sparse_placeholder(tf.float32),
+    #'features': tf.placeholder(tf.float32),
+    #'adj': tf.placeholder(tf.float32),
+    #'adj_orig': tf.sparse_placeholder(tf.float32),
+    'dropout': tf.placeholder_with_default(0., shape=()),
+    'lr': tf.sparse_placeholder(tf.float32),
 	'k': tf.sparse_placeholder(tf.float32),
 	'i': tf.sparse_placeholder(tf.float32)
-        #'edges': tf.placeholder((tf.int32, tf.int32)),
-        #'non_edges': tf.placeholder((tf.int32, tf.int32))
+    #'edges': tf.placeholder((tf.int32, tf.int32)),
+    # #'non_edges': tf.placeholder((tf.int32, tf.int32))
     }
 def add_arguments(parser):
     parser.register("type", "bool", lambda v: v.lower() == "true")
@@ -33,6 +33,7 @@ def add_arguments(parser):
     # network
     parser.add_argument("--num_epochs", type=int, default=32, help="Number of epochs")
     parser.add_argument("--learning_rate", type=float, default=0.00005, help="learning rate")
+    parser.add_argument("--dropout_rate", type=float, default=0.00005, help="dropout rate")
     parser.add_argument("--log_every", type=int, default=5, help="write the log in how many iterations")
     parser.add_argument("--graph_file", type=str, default=None,
                         help="The file where the graph structure is saved")
@@ -46,6 +47,7 @@ def create_hparams(flags):
       graph_file=flags.graph_file,
       out_dir=flags.out_dir,
       learning_rate=flags.learning_rate,
+      dropout_rate=flags.dropout_rate,
       #training
       num_epochs=flags.num_epochs
       )
@@ -63,7 +65,7 @@ if __name__ == '__main__':
     num_features = get_shape(features)[1]
 
     print num_nodes, num_features
-    model = VAEG(placeholders, num_nodes, num_features, edges, non_edges)
+    model = VAEG(placeholders, adj, features, num_nodes, num_features, edges, non_edges)
     model.initialize()
     model.train(placeholders, hparams.out_dir)
     '''

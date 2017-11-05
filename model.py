@@ -16,9 +16,11 @@ logger.setLevel(logging.DEBUG)
 
 
 class VAEG(VAEGConfig):
-    def __init__(self, placeholders, num_nodes, num_features, edges, non_edges, istest=False):
-        self.adj = placeholders['adj']
-        self.features = placeholders['features']
+    def __init__(self, placeholders, adj, features,num_nodes, num_features, edges, non_edges, istest=False):
+        #self.adj = placeholders['adj']
+        self.adj = adj
+        self.features = features
+        #placeholders['features']
         self.features_dim = num_features
         self.input_dim = num_nodes
         self.dropout = placeholders['dropout']
@@ -60,7 +62,8 @@ class VAEG(VAEGConfig):
 
 
         #logger.info("Building VAEGCell starts...")
-        self.cell = VAEGCell(self.adj, self.features,self.edges, self.non_edges, self.rnn_size, self.latent_size)
+        #self.cell = VAEGCell(self.adj, self.features,self.edges, self.non_edges, self.rnn_size, self.latent_size)
+        self.cell = VAEGCell(self.adj, self.features, self.edges)
         #logger.info("Building VAEGCell done.")
 
         with tf.variable_scope("inputs"):
@@ -84,7 +87,7 @@ class VAEG(VAEGConfig):
         #         outputs_reshape.append(x)
         # tuple*[batch_size x seq_length, chunk_samples]
 
-        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call()
+        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.k, self.i)
         self.prob = dec_out
         #self.sigma = dec_sigma
 
@@ -104,9 +107,9 @@ class VAEG(VAEGConfig):
         logger.info("Initialization of parameters")
         self.sess.run(tf.global_variables_initializer())
 
-    def restore(self):
+    def restore(self, savedir):
         saver = tf.train.Saver(tf.global_variables())
-        ckpt = tf.train.get_checkpoint_state(SAVE_DIR)
+        ckpt = tf.train.get_checkpoint_state(savedir)
         print("Load the model from {}".format(ckpt.model_checkpoint_path))
         saver.restore(self.sess, ckpt.model_checkpoint_path)
 
