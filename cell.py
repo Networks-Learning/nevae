@@ -4,7 +4,9 @@ import numpy as np
 from utils import *
 from math import exp
 
-class VAEGCell(tf.nn.rnn_cell.RNNCell):
+
+#class VAEGCell(tf.nn.rnn_cell.RNNCell):
+class VAEGCell(object):
     """Variational Auto Encoder cell."""
 
     def __init__(self, adj, features, edges, non_edges, x_dim, h_dim, z_dim = 100):
@@ -17,16 +19,19 @@ class VAEGCell(tf.nn.rnn_cell.RNNCell):
         self.adj = adj
         self.features = features
         self.edges = edges
-	self.non_edges = non_edges
-        self.n_h = h_dim
-        self.n_x = x_dim
-        self.n_z = z_dim
-        self.n_x_1 = x_dim
-        self.n_z_1 = z_dim
-        self.n_enc_hidden = z_dim
-        self.n_dec_hidden = x_dim
-        self.n_prior_hidden = z_dim
-        self.lstm = tf.nn.rnn_cell.LSTMCell(self.n_h, state_is_tuple=True)
+        self.non_edges = non_edges
+        self.name = self.__class__.__name__.lower()
+        #self.call()
+
+        # self.n_h = h_dim
+        # self.n_x = x_dim
+        # self.n_z = z_dim
+        # self.n_x_1 = x_dim
+        # self.n_z_1 = z_dim
+        # self.n_enc_hidden = z_dim
+        # self.n_dec_hidden = x_dim
+        # self.n_prior_hidden = z_dim
+        #self.lstm = tf.nn.rnn_cell.LSTMCell(self.n_h, state_is_tuple=True)
 
     @property
     def state_size(self):
@@ -36,7 +41,8 @@ class VAEGCell(tf.nn.rnn_cell.RNNCell):
     def output_size(self):
         return self.n_h
 
-    def __call__(self, input, state,scope=None):
+
+    def __call__(self,k,i, scope=None):
         '''
 		Args:
 			x - input 2D tensor [batch_size x 2*self.chunk_samples]
@@ -45,11 +51,11 @@ class VAEGCell(tf.nn.rnn_cell.RNNCell):
 			scope - string
 				defaults to be None
     	'''
-        adj,feature ,k, i = input
+        #adj,feature ,k, i = input
         n = get_shape(self.adj)[0]
         d = get_shape(self.feature)[1]
         with tf.variable_scope(scope or type(self).__name__):
-            c_x = input_layer(adj, feature, k, i, activation=None, batch_norm=False, istrain=False, scope=None)
+            c_x = input_layer(self.adj, self.feature, k, i, activation=None, batch_norm=False, istrain=False, scope=None)
             #h, c = state
             with tf.variable_scope("Prior"):
                 #prior_hidden = fc_layer(h, self.n_prior_hidden, activation = tf.nn.relu, scope = "hidden")
@@ -57,7 +63,7 @@ class VAEGCell(tf.nn.rnn_cell.RNNCell):
                 #tf.get_variable(name="prior_mu", shape=[n,self.n_x,1], initialiser=) #fc_layer(prior_hidden, self.n_z, scope = "mu")
                 prior_sigma = tf.diag(np.ones(shape=[1,n]),name="prior_sigma") #fc_layer(prior_hidden, self.n_z, activation = tf.nn.softplus, scope = "sigma")# >=0
 
-            cx_1 = fc_layer(tf.matmul(c_x, get_basis(adj)), [n,d], scope="phi_C")# >=0
+            cx_1 = fc_layer(tf.matmul(c_x, get_basis(self.adj)), [n,d], scope="phi_C")# >=0
 
             with tf.variable_scope("Encoder"):
                 enc_hidden = fc_layer(tf.concat(values=(cx_1, c_x[i]), axis=1), self.n_enc_hidden, activation = tf.nn.relu, scope = "hidden")
@@ -89,3 +95,7 @@ class VAEGCell(tf.nn.rnn_cell.RNNCell):
             #output, next_state = self.lstm(, state)
 
         return (enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma)
+
+    def call(self):
+        #with tf.variable_scope(self.name):
+            return self.__call__()

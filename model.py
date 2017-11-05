@@ -69,8 +69,8 @@ class VAEG(VAEGConfig):
 
         # [batch_size* seq_length, chunk_samples*2]
         #self.target = tf.reshape(self.target_data, [-1, 2 * self.chunk_samples])
-	self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-        outputs, last_state = tf.contrib.rnn.static_rnn(self.cell, inputs)
+        #self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
+        #outputs, last_state = tf.contrib.rnn.static_rnn(self.cell, inputs)
         #initial_state=(self.initial_state_c, self.initial_state_h))
         # outputs seq_length*tuple*[batch_size, chunk_samples]
         # outputs_reshape = []
@@ -84,11 +84,11 @@ class VAEG(VAEGConfig):
         #         outputs_reshape.append(x)
         # tuple*[batch_size x seq_length, chunk_samples]
 
-        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = outputs
+        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call()
         self.prob = dec_out
         #self.sigma = dec_sigma
 
-        self.final_state_c, self.final_state_h = last_state
+        #self.final_state_c, self.final_state_h = last_state
         self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
 
         print_vars("trainable_variables")
@@ -110,9 +110,9 @@ class VAEG(VAEGConfig):
         print("Load the model from {}".format(ckpt.model_checkpoint_path))
         saver.restore(self.sess, ckpt.model_checkpoint_path)
 
-    def train(self,placeholders):
-        create_dir(SAVE_DIR)
-        ckpt = tf.train.get_checkpoint_state(SAVE_DIR)
+    def train(self,placeholders, savedir):
+        create_dir(savedir)
+        ckpt = tf.train.get_checkpoint_state(savedir)
         saver = tf.train.Saver(tf.global_variables())
 
         if ckpt:
@@ -137,7 +137,7 @@ class VAEG(VAEGConfig):
                                                                                       self.num_epochs * self.n_batches,
                                                                                       epoch + 1,
                                                                                       train_loss))
-                    checkpoint_path = os.path.join(SAVE_DIR, 'model.ckpt')
+                    checkpoint_path = os.path.join(savedir, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))
 

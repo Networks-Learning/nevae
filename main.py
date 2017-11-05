@@ -64,8 +64,8 @@ if __name__ == '__main__':
 
     print num_nodes, num_features
     model = VAEG(placeholders, num_nodes, num_features, edges, non_edges)
-    #model.initialize()
-    #model.train()
+    model.initialize()
+    model.train(placeholders, hparams.out_dir)
     '''
     Test code
     model2 = VRNN(True)
