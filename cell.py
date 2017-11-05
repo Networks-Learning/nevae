@@ -53,9 +53,9 @@ class VAEGCell(object):
     	'''
         #adj,feature ,k, i = input
         n = get_shape(self.adj)[0]
-        d = get_shape(self.feature)[1]
+        d = get_shape(self.features)[1]
         with tf.variable_scope(scope or type(self).__name__):
-            c_x = input_layer(self.adj, self.feature, k, i, activation=None, batch_norm=False, istrain=False, scope=None)
+            c_x = input_layer(self.adj, self.features, k, i, activation=None, batch_norm=False, istrain=False, scope=None)
             #h, c = state
             with tf.variable_scope("Prior"):
                 #prior_hidden = fc_layer(h, self.n_prior_hidden, activation = tf.nn.relu, scope = "hidden")
