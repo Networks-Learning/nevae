@@ -63,7 +63,7 @@ class VAEG(VAEGConfig):
 
         #logger.info("Building VAEGCell starts...")
         #self.cell = VAEGCell(self.adj, self.features,self.edges, self.non_edges, self.rnn_size, self.latent_size)
-        self.cell = VAEGCell(self.adj, self.features, self.edges)
+        self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
         #logger.info("Building VAEGCell done.")
 
         with tf.variable_scope("inputs"):
