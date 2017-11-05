@@ -21,9 +21,9 @@ placeholders = {
     #'adj': tf.placeholder(tf.float32),
     #'adj_orig': tf.sparse_placeholder(tf.float32),
     'dropout': tf.placeholder_with_default(0., shape=()),
-    'lr': tf.sparse_placeholder(tf.float32),
-	'k': tf.sparse_placeholder(tf.float32),
-	'i': tf.sparse_placeholder(tf.float32)
+    'lr': tf.placeholder(tf.float32),
+	'k': tf.placeholder(tf.float32),
+	'i': tf.placeholder(tf.float32)
     #'edges': tf.placeholder((tf.int32, tf.int32)),
     # #'non_edges': tf.placeholder((tf.int32, tf.int32))
     }
