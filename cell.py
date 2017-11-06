@@ -44,14 +44,15 @@ class VAEGCell(object):
         #n = get_shape(self.adj)[0]
         #d = get_shape(self.features)[1]
         with tf.variable_scope(scope or type(self).__name__):
-
+	    print "c_x shape",c_x.shape
             c_x = input_layer(c_x, self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False, scope=None)
-            with tf.variable_scope("Prior"):
+            print "c_x shape",c_x.shape
+	    with tf.variable_scope("Prior"):
                 prior_mu = tf.get_variable(name="prior_mu", shape=[n,d], initializer=tf.zeros_initializer())
                 prior_sigma = tf.diag(np.ones(shape=[1,n]),name="prior_sigma")
 
             with tf.variable_scope("Encoder"):
-                enc_hidden = fc_layer(c_x, self.n_enc_hidden, activation=tf.nn.relu, scope="hidden")
+                enc_hidden = fc_layer(c_x, [k,d], activation=tf.nn.relu, scope="hidden")
                 enc_mu = fc_layer(enc_hidden, [n,d], scope = 'mu', name="enc_mu")
                 enc_sigma = tf.diag(fc_layer(enc_hidden, [1,n], activation = tf.nn.softplus, scope = 'sigma'), name="enc_sigma")
 
@@ -70,6 +71,6 @@ class VAEGCell(object):
 
         return (enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma)
 
-    def call(self,k,n,d):
+    def call(self,inputs,n,d,k):
         #with tf.variable_scope(self.name):
-            return self.__call__(k,n,d)
+            return self.__call__(inputs,n,d,k)
