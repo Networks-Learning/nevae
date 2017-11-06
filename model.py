@@ -16,22 +16,15 @@ logger.setLevel(logging.DEBUG)
 
 
 class VAEG(VAEGConfig):
-    def __init__(self, placeholders, adj, features,num_nodes, num_features, edges, non_edges, istest=False):
-        #self.adj = placeholders['adj']
-        self.adj = adj
-        self.features = features
-        #placeholders['features']
+    def __init__(self, hparams, placeholders, num_nodes, num_features, edges, non_edges, istest=False):
+        self.adj = placeholders['adj']
+        self.features = placeholders['features']
         self.features_dim = num_features
         self.input_dim = num_nodes
         self.dropout = placeholders['dropout']
-        #self.output_data = placeholders['output']
-        self.k = placeholders['k']
-        self.i = placeholders['i']
+        self.k = hparams.random_walk
         self.lr = placeholders['lr']
-        self.edges, self.non_edges = edges, non_edges 
-        self.rnn_size = 3 # num of hidden states in RNN
-        self.latent_size = 3 # size of latent space
-        self.batch_size = 1	
+        self.edges, self.non_edges = edges, non_edges
 
 
         #logger.info("Building model starts...")
@@ -60,48 +53,16 @@ class VAEG(VAEGConfig):
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
             return tf.reduce_mean(kl_loss + likelihood_loss)
 
-
-        #logger.info("Building VAEGCell starts...")
-        #self.cell = VAEGCell(self.adj, self.features,self.edges, self.non_edges, self.rnn_size, self.latent_size)
         self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
-        #logger.info("Building VAEGCell done.")
 
-        with tf.variable_scope("inputs"):
-            inputs = self.i 
-        #[self.adj, self.features, self.k, self.i]
-
-        # [batch_size* seq_length, chunk_samples*2]
-        #self.target = tf.reshape(self.target_data, [-1, 2 * self.chunk_samples])
-        #self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-        #outputs, last_state = tf.contrib.rnn.static_rnn(self.cell, inputs)
-        #initial_state=(self.initial_state_c, self.initial_state_h))
-        # outputs seq_length*tuple*[batch_size, chunk_samples]
-        # outputs_reshape = []
-        # names = ["enc_mu", "enc_sigma", "dec_out", "prior_mu", "prior_sigma"]
-
-        # for n, name in enumerate(names):
-        #     with tf.variable_scope(name):
-        #         x = tf.stack([o[n] for o in outputs])  # [seq_length, batch_size, chunk_samples]
-        #         x = tf.transpose(x, [1, 0, 2])  # [batch_size, seq_length, chunk_samples]
-        #         x = tf.reshape(x, [self.batch_size * self.seq_length, -1])  # [batch_size x seq_length, chunk_samples]
-        #         outputs_reshape.append(x)
-        # tuple*[batch_size x seq_length, chunk_samples]
-
-        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.k, self.i)
+        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.k)
         self.prob = dec_out
-        #self.sigma = dec_sigma
-
-        #self.final_state_c, self.final_state_h = last_state
         self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
 
         print_vars("trainable_variables")
         self.lr = tf.Variable(self.lr, trainable=False)
         self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost)
-        #logger.info("Building model done.")
-
         self.sess = tf.Session()
-
-
 
     def initialize(self):
         logger.info("Initialization of parameters")
@@ -115,7 +76,6 @@ class VAEG(VAEGConfig):
 
     def train(self,placeholders, hparams):
         savedir = hparams.out_dir
-        k = hparams.k
         lr = hparams.learning_rate
         dr = hparams.dropout_rate
 
@@ -130,12 +90,12 @@ class VAEG(VAEGConfig):
             print("Load the model from %s" % ckpt.model_checkpoint_path)
 
         iteration = 0
-        for i in range(k):
-            for epoch in range(num_epochs):
-            # Learning rate decay
+        #for i in range(k):
+        for epoch in range(num_epochs):
+                # Learning rate decay
                 self.sess.run(tf.assign(lr, lr * (dr ** epoch)))
 
-                feed_dict = construct_feed_dict( k,i, lr, dr, placeholders)
+                feed_dict = construct_feed_dict(self.adj, self.features, lr, dr, placeholders)
                 #feed_dict.update({placeholders['dropout']: FLAGS.dropout})
                 #outs = self.sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
                 #train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
@@ -143,10 +103,7 @@ class VAEG(VAEGConfig):
 
                 iteration += 1
                 if iteration % self.log_every == 0 and iteration > 0:
-                    print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration,
-                                                                                      self.num_epochs * self.n_batches,
-                                                                                      epoch + 1,
-                                                                                      train_loss))
+                    print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
                     checkpoint_path = os.path.join(savedir, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))
