@@ -24,6 +24,8 @@ class VAEG(VAEGConfig):
         self.dropout = placeholders['dropout']
         self.k = hparams.random_walk
         self.lr = placeholders['lr']
+        self.n = num_nodes
+        self.d = num_features
         self.edges, self.non_edges = edges, non_edges
 
 
@@ -55,7 +57,7 @@ class VAEG(VAEGConfig):
 
         self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
 
-        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.k)
+        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.k, self.n, self.d)
         self.prob = dec_out
         self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
 

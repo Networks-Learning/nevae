@@ -31,7 +31,7 @@ class VAEGCell(object):
         return self.n_h
 
 
-    def __call__(self,k, scope=None):
+    def __call__(self,n,d,k, scope=None):
         '''
 		Args:
 			x - input 2D tensor [batch_size x 2*self.chunk_samples]
@@ -41,10 +41,10 @@ class VAEGCell(object):
 				defaults to be None
     	'''
         #adj,feature ,k, i = input
-        n = get_shape(self.adj)[0]
-        d = get_shape(self.features)[1]
+        #n = get_shape(self.adj)[0]
+        #d = get_shape(self.features)[1]
         with tf.variable_scope(scope or type(self).__name__):
-            c_x = input_layer(self.adj, self.features, k, activation=None, batch_norm=False, istrain=False, scope=None)
+            c_x = input_layer(self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False, scope=None)
             with tf.variable_scope("Prior"):
                 prior_mu = tf.get_variable(name="prior_mu", shape=[n,d], initializer=tf.zeros_initializer())
                 prior_sigma = tf.diag(np.ones(shape=[1,n]),name="prior_sigma")
@@ -69,6 +69,6 @@ class VAEGCell(object):
 
         return (enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma)
 
-    def call(self,k):
+    def call(self,k,n,d):
         #with tf.variable_scope(self.name):
-            return self.__call__(k)
+            return self.__call__(k,n,d)
