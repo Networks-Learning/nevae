@@ -44,7 +44,7 @@ class VAEGCell(object):
         #n = get_shape(self.adj)[0]
         #d = get_shape(self.features)[1]
         with tf.variable_scope(scope or type(self).__name__):
-	    print "c_x shape",c_x.shape
+            print "c_x shape",c_x.shape
             c_x = input_layer(c_x, self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False, scope=None)
             print "c_x shape",c_x.shape
 	    with tf.variable_scope("Prior"):

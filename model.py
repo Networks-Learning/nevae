@@ -26,7 +26,7 @@ class VAEG(VAEGConfig):
         self.lr = placeholders['lr']
         self.n = num_nodes
         self.d = num_features
-        self.input_data = placeholders['input']
+
         self.edges, self.non_edges = edges, non_edges
 
 
@@ -58,7 +58,7 @@ class VAEG(VAEGConfig):
 
         self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
 
-
+        self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input_data')
         enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
         self.prob = dec_out
         self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)

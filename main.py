@@ -19,7 +19,6 @@ FLAGS = None
 placeholders = {
     'features': tf.placeholder(tf.float32),
     'adj': tf.placeholder(tf.float32),
-    'input': tf.placeholder(tf.float32),
     'dropout': tf.placeholder_with_default(0., shape=()),
     'lr': tf.placeholder_with_default(0., shape=())
     }

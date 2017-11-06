@@ -23,7 +23,7 @@ def fc_layer(input_, output_size, activation = None, batch_norm = False, istrain
     Args :
         input_  - 2D tensor
             general shape : [batch, input_size]
-        output_size - int
+        output_size - list of the sizes for the output
             shape of output 2D tensor
         activation - activation function
             defaults to be None
