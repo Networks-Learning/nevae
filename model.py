@@ -17,8 +17,6 @@ logger.setLevel(logging.DEBUG)
 
 class VAEG(VAEGConfig):
     def __init__(self, hparams, placeholders, num_nodes, num_features, edges, non_edges, istest=False):
-        self.adj = placeholders['adj']
-        self.features = placeholders['features']
         self.features_dim = num_features
         self.input_dim = num_nodes
         self.dropout = placeholders['dropout']
@@ -58,7 +56,10 @@ class VAEG(VAEGConfig):
 
         self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
 
-        self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input_data')
+        self.adj = tf.placeholder(dtype=tf.int32, shape=[self.n, self.n], name='adj')
+        self.features = tf.placeholder(dtype=tf.float32, shape=[self.n, self.d], name='features')
+        self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
+
         enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
         self.prob = dec_out
         self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
