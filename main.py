@@ -20,6 +20,7 @@ placeholders = {
     'features': tf.placeholder(tf.float32),
     'adj': tf.placeholder(tf.float32),
     'dropout': tf.placeholder_with_default(0., shape=()),
+    'lr': tf.placeholder_with_default(0., shape=())
     }
 def add_arguments(parser):
     parser.register("type", "bool", lambda v: v.lower() == "true")
