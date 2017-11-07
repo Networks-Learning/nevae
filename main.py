@@ -18,7 +18,8 @@ logger.setLevel(logging.DEBUG)
 FLAGS = None
 placeholders = {
     'dropout': tf.placeholder_with_default(0., shape=()),
-    'lr': tf.placeholder_with_default(0., shape=())
+    'lr': tf.placeholder_with_default(0., shape=()),
+    'decay': tf.placeholder_with_default(0., shape=())
     }
 def add_arguments(parser):
     parser.register("type", "bool", lambda v: v.lower() == "true")
@@ -26,6 +27,7 @@ def add_arguments(parser):
     # network
     parser.add_argument("--num_epochs", type=int, default=32, help="Number of epochs")
     parser.add_argument("--learning_rate", type=float, default=0.00005, help="learning rate")
+    parser.add_argument("--decay_rate", type=float, default=1.0, help="decay rate")
     parser.add_argument("--dropout_rate", type=float, default=0.00005, help="dropout rate")
     parser.add_argument("--log_every", type=int, default=5, help="write the log in how many iterations")
     parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
@@ -42,6 +44,7 @@ def create_hparams(flags):
       out_dir=flags.out_dir,
       # training
       learning_rate=flags.learning_rate,
+      decay_rate=flags.decay_rate,
       dropout_rate=flags.dropout_rate,
       num_epochs=flags.num_epochs,
       random_walk=flags.random_walk
@@ -62,7 +65,7 @@ if __name__ == '__main__':
     print num_nodes, num_features
     model = VAEG(hparams, placeholders, num_nodes, num_features, edges, non_edges)
     model.initialize()
-    model.train(placeholders, hparams.out_dir)
+    model.train(placeholders, hparams)
     '''
     Test code
     model2 = VRNN(True)

@@ -22,7 +22,8 @@ class VAEG(VAEGConfig):
         self.dropout = placeholders['dropout']
         self.k = hparams.random_walk
         self.lr = placeholders['lr']
-        self.n = num_nodes
+        self.decay = placeholders['decay']
+	self.n = num_nodes
         self.d = num_features
 
         self.edges, self.non_edges = edges, non_edges
@@ -85,6 +86,7 @@ class VAEG(VAEGConfig):
         savedir = hparams.out_dir
         lr = hparams.learning_rate
         dr = hparams.dropout_rate
+	decay = hparams.decay_rate
 
         # training
         num_epochs = hparams.num_epochs
@@ -100,9 +102,9 @@ class VAEG(VAEGConfig):
         #for i in range(k):
         for epoch in range(num_epochs):
                 # Learning rate decay
-                self.sess.run(tf.assign(lr, lr * (dr ** epoch)))
+                self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
 
-                feed_dict = construct_feed_dict(self.adj, self.features, lr, dr, self.k, self.n, self.d, placeholders)
+                feed_dict = construct_feed_dict(self.adj, self.features, lr, dr, self.k, self.n, self.d, decay, placeholders)
                 #feed_dict.update({placeholders['dropout']: FLAGS.dropout})
                 #outs = self.sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
                 #train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
