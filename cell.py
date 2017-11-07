@@ -89,10 +89,10 @@ class VAEGCell(object):
 		dec_mat = tf.exp(tf.reshape(dec_hidden, [n,n]))
                 print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
 		comp = tf.subtract(tf.ones([n, n], tf.float32), self.adj)
-		temp = tf.reduce_sum(tf.matmul(comp,dec_mat))
+		temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
 		#print temp
 		negscore = tf.fill([n,n], temp)
-		posscore = tf.matmul(self.adj, dec_mat)
+		posscore = tf.multiply(self.adj, dec_mat)
 		dec_out = tf.truediv(posscore, tf.add(posscore, negscore))
 	print "shapes mu sig dec_out prior mu prio sig", enc_mu.dtype, enc_sigma.dtype, tf.convert_to_tensor(dec_out).dtype, prior_mu.dtype, prior_sigma.dtype
         return (enc_mu, enc_sigma, tf.convert_to_tensor(dec_out), prior_mu, prior_sigma)

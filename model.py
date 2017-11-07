@@ -35,8 +35,9 @@ class VAEG(VAEGConfig):
             '''
             ll = 0
             with tf.variable_scope('NLL'):
-                for (u,v) in self.edges:
-                    ll += tf.log(prob_dict[u][v])
+                ll = tf.reduce_sum(tf.log(tf.multiply(self.adj, prob_dict)))
+                #for (u,v) in self.edges:
+                #    ll += tf.log(prob_dict[u][v])
             return (-ll)
 
         def kl_gaussian(mu_1, sigma_1, mu_2, sigma_2):
