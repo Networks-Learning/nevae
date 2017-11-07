@@ -82,7 +82,7 @@ class VAEG(VAEGConfig):
         print("Load the model from {}".format(ckpt.model_checkpoint_path))
         saver.restore(self.sess, ckpt.model_checkpoint_path)
 
-    def train(self,placeholders, hparams):
+    def train(self,placeholders, hparams, adj, features):
         savedir = hparams.out_dir
         lr = hparams.learning_rate
         dr = hparams.dropout_rate
@@ -105,13 +105,16 @@ class VAEG(VAEGConfig):
                 self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
 
                 feed_dict = construct_feed_dict(self.adj, self.features, lr, dr, self.k, self.n, self.d, decay, placeholders)
-                #feed_dict.update({placeholders['dropout']: FLAGS.dropout})
+                feed_dict.update({self.adj: adj})
+		feed_dict.update({self.features: features})
+		feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
+		#feed_dict.update({placeholders['dropout']: FLAGS.dropout})
                 #outs = self.sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
                 #train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
                 train_loss, _ = self.sess.run([self.cost, self.train_op], feed_dict=feed_dict)
 
                 iteration += 1
-                if iteration % self.log_every == 0 and iteration > 0:
+                if iteration % hparams.log_every == 0 and iteration > 0:
                     print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
                     checkpoint_path = os.path.join(savedir, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)

@@ -20,7 +20,7 @@ def construct_feed_dict(adj, features,lr,dropout, k, n, d, decay, placeholders):
     feed_dict.update({placeholders['dropout']: dropout})
     feed_dict.update({placeholders['decay']: decay})
 
-    feed_dict.update({placeholders['input']:np.zeros([k,n,d])})
+    #feed_dict.update({placeholders['input']:np.zeros([k,n,d])})
 
     return feed_dict
 
@@ -98,7 +98,7 @@ def load_data(filename):
     non_edges = list(set(GC.edges()) - set(edges))
     for u in G.nodes():
         degreemat[int(u)][int(u)] = G.degree(u)
-    return (tf.convert_to_tensor(nx.adjacency_matrix(G).todense()), tf.convert_to_tensor(degreemat), edges, non_edges)
+    return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
 
 def pickle_save(content, path):
     '''Save the content on the path'''

@@ -47,7 +47,8 @@ def create_hparams(flags):
       decay_rate=flags.decay_rate,
       dropout_rate=flags.dropout_rate,
       num_epochs=flags.num_epochs,
-      random_walk=flags.random_walk
+      random_walk=flags.random_walk,
+      log_every=flags.log_every
       )
 
 if __name__ == '__main__':
@@ -59,13 +60,13 @@ if __name__ == '__main__':
     adj, features, edges, non_edges = load_data(hparams.graph_file)
     #print adj
     #print features
-    num_nodes = get_shape(adj)[0]
-    num_features = get_shape(features)[1]
+    num_nodes = adj.shape[0]
+    num_features = features.shape[1]
 
     print num_nodes, num_features
     model = VAEG(hparams, placeholders, num_nodes, num_features, edges, non_edges)
     model.initialize()
-    model.train(placeholders, hparams)
+    model.train(placeholders, hparams, adj, features)
     '''
     Test code
     model2 = VRNN(True)
