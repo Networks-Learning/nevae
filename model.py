@@ -54,12 +54,13 @@ class VAEG(VAEGConfig):
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
             return tf.reduce_mean(kl_loss + likelihood_loss)
 
-        self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
+        #self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
 
-        self.adj = tf.placeholder(dtype=tf.int32, shape=[self.n, self.n], name='adj')
+        self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
         self.features = tf.placeholder(dtype=tf.float32, shape=[self.n, self.d], name='features')
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
 
+	self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
         enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
         self.prob = dec_out
         self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
