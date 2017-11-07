@@ -49,7 +49,7 @@ class VAEGCell(object):
             #print "c_x shape",c_x.shape
 	    with tf.variable_scope("Prior"):
                 prior_mu = tf.get_variable(name="prior_mu", shape=[n,d], initializer=tf.zeros_initializer())
-                prior_sigma = tf.matrix_diag(np.ones(shape=[1,n]),name="prior_sigma")[0]
+                prior_sigma = tf.matrix_diag(tf.ones(shape=[1,n]),name="prior_sigma")[0]
 
 	    with tf.variable_scope("Encoder"):
                 list_cx = tf.unstack(c_x)
@@ -94,7 +94,7 @@ class VAEGCell(object):
 		negscore = tf.fill([n,n], temp)
 		posscore = tf.matmul(self.adj, dec_mat)
 		dec_out = tf.truediv(posscore, tf.add(posscore, negscore))
-	print "shapes mu sig dec_out prior mu prio sig", enc_mu.shape, enc_sigma.shape, tf.convert_to_tensor(dec_out).shape, prior_mu.shape, prior_sigma.shape	
+	print "shapes mu sig dec_out prior mu prio sig", enc_mu.dtype, enc_sigma.dtype, tf.convert_to_tensor(dec_out).dtype, prior_mu.dtype, prior_sigma.dtype
         return (enc_mu, enc_sigma, tf.convert_to_tensor(dec_out), prior_mu, prior_sigma)
 
     def call(self,inputs,n,d,k):
