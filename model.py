@@ -36,7 +36,8 @@ class VAEG(VAEGConfig):
             '''
             ll = 0
             with tf.variable_scope('NLL'):
-                ll = tf.reduce_sum(tf.log(tf.multiply(self.adj, prob_dict)))
+                ll = tf.reduce_sum(tf.multiply(self.adj, prob_dict))
+                #ll = tf.reduce_sum(tf.log(tf.multiply(self.adj, prob_dict)))
                 #for (u,v) in self.edges:
                 #    ll += tf.log(prob_dict[u][v])
             return (-ll)
@@ -55,7 +56,8 @@ class VAEG(VAEGConfig):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
 	    self.kl_loss = kl_loss
-            return tf.reduce_mean(kl_loss + likelihood_loss)
+            return likelihood_loss
+	    #return tf.reduce_mean(kl_loss + likelihood_loss)
 
         #self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
 
@@ -73,7 +75,8 @@ class VAEG(VAEGConfig):
         print_vars("trainable_variables")
         self.lr = tf.Variable(self.lr, trainable=False)
         self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost)
-        self.sess = tf.Session()
+        self.check_op = tf.add_check_numerics_ops()
+	self.sess = tf.Session()
 
     def initialize(self):
         logger.info("Initialization of parameters")
@@ -116,7 +119,7 @@ class VAEG(VAEGConfig):
 		#feed_dict.update({placeholders['dropout']: FLAGS.dropout})
                 #outs = self.sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
                 #train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
-                input, train_loss, _, kl_loss, probdict, cx, wx = self.sess.run([self.input_data ,self.cost, self.train_op, self.kl_loss, self.prob, self.c_x, self.w_x], feed_dict=feed_dict)
+                input, train_loss, _, kl_loss, probdict, cx, wx, op = self.sess.run([self.input_data ,self.cost, self.train_op, self.kl_loss, self.prob, self.c_x, self.w_x, self.check_op], feed_dict=feed_dict)
 
                 iteration += 1
                 if iteration % hparams.log_every == 0 and iteration > 0:
