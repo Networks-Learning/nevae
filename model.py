@@ -54,6 +54,7 @@ class VAEG(VAEGConfig):
         def get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
+	    self.kl_loss = kl_loss
             return tf.reduce_mean(kl_loss + likelihood_loss)
 
         #self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
@@ -63,8 +64,10 @@ class VAEG(VAEGConfig):
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
 
 	self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
-        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
-        self.prob = dec_out
+        w_x,c_x, enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
+        self.c_x = c_x
+	self.w_x = w_x
+	self.prob = dec_out
         self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
 
         print_vars("trainable_variables")
@@ -107,15 +110,24 @@ class VAEG(VAEGConfig):
                 feed_dict = construct_feed_dict(self.adj, self.features, lr, dr, self.k, self.n, self.d, decay, placeholders)
                 feed_dict.update({self.adj: adj})
 		feed_dict.update({self.features: features})
+		print("Debug features")
+		print features
 		feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
 		#feed_dict.update({placeholders['dropout']: FLAGS.dropout})
                 #outs = self.sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
                 #train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
-                train_loss, _ = self.sess.run([self.cost, self.train_op], feed_dict=feed_dict)
+                input, train_loss, _, kl_loss, probdict, cx, wx = self.sess.run([self.input_data ,self.cost, self.train_op, self.kl_loss, self.prob, self.c_x, self.w_x], feed_dict=feed_dict)
 
                 iteration += 1
                 if iteration % hparams.log_every == 0 and iteration > 0:
                     print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
+		    print(probdict)
+		    print("Debug CX")
+		    print(cx)
+		    print("Debug WX")
+		    print(wx)
+		    print("Debug input")
+		    print(input)
                     checkpoint_path = os.path.join(savedir, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))

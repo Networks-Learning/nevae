@@ -3,6 +3,11 @@ from utils import *
 
 def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
     w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.contrib.layers.xavier_initializer())
+    #print "Runtime"
+    #tf.Print(w_in,[w_in])
+    #sess = tf.InteractiveSession()
+    #sess.run(w_in)
+    w_initial = w_in
     #c_mat = tf.get_variable(name="C", shape=[k, n, d], initializer=tf.contrib.layers.xavier_initializer())
     output_list = []
     for i in range(k):
@@ -13,7 +18,7 @@ def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False
             #c_mat[i] 
 	    output_list.append(tf.transpose(tf.matmul(w_in[i], tf.transpose(feature))))
     
-    return tf.stack(output_list)
+    return (w_initial,tf.stack(output_list))
 
 
 
