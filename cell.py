@@ -44,9 +44,7 @@ class VAEGCell(object):
         #n = get_shape(self.adj)[0]
         #d = get_shape(self.features)[1]
         with tf.variable_scope(scope or type(self).__name__):
-            #print "c_x shape",c_x.shape
-	    # the shape should be k * n * d
-            w_x, c_x = input_layer(c_x, self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False, scope=None)
+            c_x = input_layer(c_x, self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False, scope=None)
             #print "c_x",c_x.shape
 	    with tf.variable_scope("Prior"):
                 prior_mu = tf.get_variable(name="prior_mu", shape=[n,d,1], initializer=tf.zeros_initializer())
@@ -61,52 +59,40 @@ class VAEGCell(object):
                 enc_mu = fc_layer(enc_hidden, d, scope='mu')
 		enc_mu = tf.reshape(enc_mu, [n,d,1])
                 # output will be n X 1 then convert that to a diagonal matrix
-                enc_sigma = tf.matrix_diag(tf.transpose(fc_layer(enc_hidden, d, activation=tf.nn.softplus, scope='sigma'), name="enc_sigma"))
-	   
+                # enc_sigma = tf.matrix_diag(tf.transpose(fc_layer(enc_hidden, d, activation=tf.nn.softplus, scope='sigma'), name="enc_sigma"))
+	        enc_sigma = tf.matrix_diag(tf.transpose(fc_layer(enc_hidden, d, activation=tf.nn.relu, scope='sigma'), name="enc_sigma"))
+
 	    print "Shape encoder mu, sigma", enc_mu.shape, enc_sigma.shape
-            #with tf.variable_scope("Encoder"):
-            #    enc_hidden = fc_layer(c_x, [k,d], activation=tf.nn.relu, scope="hidden")
-            #    enc_mu = fc_layer(enc_hidden, [n,d], scope = 'mu', name="enc_mu")
-            #    enc_sigma = tf.diag(fc_layer(enc_hidden, [1,n], activation = tf.nn.softplus, scope = 'sigma'), name="enc_sigma")
 
             # Random sampling ~ N(0, 1)
             eps = tf.random_normal((n, d, 1), 0.0, 1.0, dtype=tf.float32)
-            #transposed = tf.transpose(eps, perm=[])
-	    #print "Shape eps, nmu, sig", eps.shape, enc_mu.shape, enc_sigma.shape
 	    temp_stack = []
 	    for i in range(n):
 		temp_stack.append(tf.matmul(enc_sigma[i], eps[i]))
 	    z = tf.add(enc_mu, tf.stack(temp_stack))
-	    #z = tf.add(enc_mu, tf.multiply(enc_sigma, eps))
 	    print "Shape z", z.shape
 	    with tf.variable_scope("Decoder"):
 
 	    	sum_negclass = 0.0
-                #dec_out = np.zeros([n,n])
                 z_stack = []
-                #tf.get_variable(name="dec_out", shape=[n,n])
                 for u in range(n):
                     for v in range(n):
 			#print "Debug Shape",tf.concat(values=([z[u]], [z[v]]), axis = 1).shape 
                         z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis = 1)[0])
-                # size is n^2 X 1
-       		#print z_stack.shape
 	        
 		print "Debug dec",tf.stack(z_stack).shape         
-		dec_hidden = fc_layer(tf.stack(z_stack), 1, activation = tf.nn.relu, scope = "hidden")
-                #print "Debug dec_hidden", dec_hidden.shape, dec_hidden.dtype, dec_hidden
+		dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
 
 		dec_mat = tf.exp(tf.reshape(dec_hidden, [n,n]))
                 print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
 		comp = tf.subtract(tf.ones([n, n], tf.float32), self.adj)
 		temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
-		#print temp
-		negscore = tf.fill([n,n], temp)
+		negscore = tf.fill([n,n], temp+1e-9)
 		posscore = tf.multiply(self.adj, dec_mat)
-		dec_out = tf.multiply(self.adj, dec_mat) 
-		#tf.truediv(posscore, tf.add(posscore, negscore))
+		#dec_out = tf.multiply(self.adj, dec_mat) 
+		dec_out = tf.truediv(posscore, tf.add(posscore, negscore))
 	print "shapes mu sig dec_out prior mu prio sig", enc_mu.shape, enc_sigma.shape, tf.convert_to_tensor(dec_out).shape, prior_mu.shape, prior_sigma.shape
-        return (w_x, c_x, enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma)
+        return (enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma)
 
     def call(self,inputs,n,d,k):
         #with tf.variable_scope(self.name):

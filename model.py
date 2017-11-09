@@ -36,10 +36,8 @@ class VAEG(VAEGConfig):
             '''
             ll = 0
             with tf.variable_scope('NLL'):
-                ll = tf.reduce_sum(tf.multiply(self.adj, prob_dict))
-                #ll = tf.reduce_sum(tf.log(tf.multiply(self.adj, prob_dict)))
-                #for (u,v) in self.edges:
-                #    ll += tf.log(prob_dict[u][v])
+                #ll = tf.reduce_sum(tf.multiply(self.adj, prob_dict))
+                ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, prob_dict), tf.fill([self.n,self.n], 1e-9))))
             return (-ll)
 
         def kl_gaussian(mu_1, sigma_1, mu_2, sigma_2):
@@ -47,28 +45,39 @@ class VAEG(VAEGConfig):
                 Kullback leibler divergence for two gaussian distributions
             '''
             with tf.variable_scope("kl_gaussisan"):
-                return tf.reduce_sum(0.5 * (
-                    2 * tf.log(tf.maximum(1e-9, sigma_2), name='log_sigma_2')
-                    - 2 * tf.log(tf.maximum(1e-9, sigma_1), name='log_sigma_1')
-                    + (tf.square(sigma_1) + tf.square(mu_1 - mu_2)) / tf.maximum(1e-9, (tf.square(sigma_2))) - 1), 1)
+                temp_stack = []
+                for i in range(self.n):
+                    temp_stack.append(tf.matmul(tf.matrix_inverse(tf.square(sigma_2[i])), tf.square(sigma_1[i])))
+                first_term = tf.trace(tf.stack(temp_stack))
+                
+                temp_stack = []
+                for i in range(self.n):
+                    temp_stack.append(tf.matmul(tf.matmul(tf.transpose(tf.subtract(mu_2[i],  mu_1[i])), tf.matrix_inverse(tf.square(sigma_2[i]))),tf.subtract(mu_2[i], mu_1[i])))
+                second_term = tf.reshape(tf.stack(temp_stack), [self.n])
+                
+                k = tf.fill([self.n], tf.cast(self.d, tf.float32))
+
+                temp_stack = []
+                for i in range(self.n):
+                    temp_stack.append(tf.log(tf.truediv(tf.matrix_determinant(sigma_2[i]),tf.add(tf.matrix_determinant(sigma_1[i]), tf.fill([self.d, self.d], 1e-9)))))
+
+                third_term = tf.stack(temp_stack)
+                
+                print "debug KL", first_term.dtype, second_term.dtype, k.dtype, third_term.dtype
+                return 0.5 *tf.reduce_sum((tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)))
 
         def get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
-	    self.kl_loss = kl_loss
-            return likelihood_loss
-	    #return tf.reduce_mean(kl_loss + likelihood_loss)
+	    return ( kl_loss + likelihood_loss)
 
-        #self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
 
         self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
         self.features = tf.placeholder(dtype=tf.float32, shape=[self.n, self.d], name='features')
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
 
 	self.cell = VAEGCell(self.adj, self.features, self.edges, self.non_edges)
-        w_x,c_x, enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
-        self.c_x = c_x
-	self.w_x = w_x
+        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
 	self.prob = dec_out
         self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
 
@@ -105,32 +114,24 @@ class VAEG(VAEGConfig):
             print("Load the model from %s" % ckpt.model_checkpoint_path)
 
         iteration = 0
+        feed_dict = construct_feed_dict(self.adj, self.features, lr, dr, self.k, self.n, self.d, decay, placeholders)
+        feed_dict.update({self.adj: adj})
+	feed_dict.update({self.features: features})
+	print("Debug features")
+	print features
+	feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
+
         #for i in range(k):
         for epoch in range(num_epochs):
                 # Learning rate decay
                 self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
 
-                feed_dict = construct_feed_dict(self.adj, self.features, lr, dr, self.k, self.n, self.d, decay, placeholders)
-                feed_dict.update({self.adj: adj})
-		feed_dict.update({self.features: features})
-		print("Debug features")
-		print features
-		feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
-		#feed_dict.update({placeholders['dropout']: FLAGS.dropout})
-                #outs = self.sess.run([opt.opt_op, opt.cost, opt.accuracy], feed_dict=feed_dict)
-                #train_loss, _, _= self.sess.run([self.cost, self.train_op], feed_dict)
-                input, train_loss, _, kl_loss, probdict, cx, wx, op = self.sess.run([self.input_data ,self.cost, self.train_op, self.kl_loss, self.prob, self.c_x, self.w_x, self.check_op], feed_dict=feed_dict)
+                input_, train_loss, _, probdict, op = self.sess.run([self.input_data ,self.cost, self.train_op, self.prob, self.check_op], feed_dict=feed_dict)
 
                 iteration += 1
                 if iteration % hparams.log_every == 0 and iteration > 0:
                     print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
 		    print(probdict)
-		    print("Debug CX")
-		    print(cx)
-		    print("Debug WX")
-		    print(wx)
-		    print("Debug input")
-		    print(input)
                     checkpoint_path = os.path.join(savedir, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))
