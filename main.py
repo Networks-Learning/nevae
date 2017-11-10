@@ -57,19 +57,15 @@ if __name__ == '__main__':
     FLAGS, unparsed = nmt_parser.parse_known_args()
     hparams = create_hparams(FLAGS)
     # loading the data from a file
-    adj, features, edges, non_edges = load_data(hparams.graph_file)
-    #print adj
-    #print features
-    num_nodes = adj.shape[0]
-    num_features = features.shape[1]
+    adj, features = load_data(hparams.graph_file)
+    num_nodes = adj[0].shape[0]
+    num_features = features[0].shape[1]
 
-    print num_nodes, num_features
-    model = VAEG(hparams, placeholders, num_nodes, num_features, edges, non_edges)
+    #print num_nodes, num_features
+    model = VAEG(hparams, placeholders, num_nodes, num_features)
     model.initialize()
     model.train(placeholders, hparams, adj, features)
-    '''
-    Test code
-    model2 = VRNN(True)
-    model2.restore()
-    print(model2.sample())
-    '''
+    #Test code
+    #model2 = VAEG(hparams, placeholders, 10, 10)
+    #model2.restore(hparams.out_dir)
+    #model2.samplegraph(hparams, placeholders,20)

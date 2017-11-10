@@ -35,15 +35,31 @@ def get_params():
 	parser.add_argument('--k', type=int, default=5,
                         help='length of the random walk')
 
+        parser.add_argument('--N', type=int, default=5,
+                            help='Number graph with the same parameter you want to learn')
 	params = parser.parse_args()
 	return params
 	
 if __name__ == "__main__":
 	params = get_params()
-	G = create_graph(params.n, params.p)
-	A = nx.adjacency_matrix(G)
-	nx.write_edgelist(G, "test.edgelist")
-	#print A
+	#fh= open("test.edgelist", "ab")
+        #G = create_graph(params.n, params.p)
+	#A = nx.adjacency_matrix(G)
+        for i in range(params.N):
+            G = create_graph(params.n, params.p)
+	    A = nx.adjacency_matrix(G)
+            fh = open("graph/test"+str(i)+".edgelist" , "wb")
+            nx.write_edgelist(G, fh)
+            fh.write("\n")
+	#fh.close()
+        #fh= open("test.edgelist", "rb")
+        #lines = fh.read().split('\n\n')
+        #for line in lines:
+        #print line
+        #G = nx.read_edgelist(fh)
+        #A = nx.adjacency_matrix(G)
+        #print A.todense()
+        #print A
 	
         #for n in G.nodes():	
 	#	print n,random_walk(G, n, params.k)

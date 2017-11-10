@@ -9,7 +9,7 @@ from math import exp
 class VAEGCell(object):
     """Variational Auto Encoder cell."""
 
-    def __init__(self, adj, features, edges, non_edges):
+    def __init__(self, adj, features):
         '''
         Args:
             x_dim - chunk_samples
@@ -18,8 +18,8 @@ class VAEGCell(object):
         '''
         self.adj = adj
         self.features = features
-        self.edges = edges
-        self.non_edges = non_edges
+        #self.edges = edges
+        #self.non_edges = non_edges
         self.name = self.__class__.__name__.lower()
 
     @property
@@ -83,16 +83,16 @@ class VAEGCell(object):
 		print "Debug dec",tf.stack(z_stack).shape         
 		dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
 
-		dec_mat = tf.exp(tf.reshape(dec_hidden, [n,n]))
-                print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
-		comp = tf.subtract(tf.ones([n, n], tf.float32), self.adj)
-		temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
-		negscore = tf.fill([n,n], temp+1e-9)
-		posscore = tf.multiply(self.adj, dec_mat)
+		#dec_mat = tf.exp(tf.reshape(dec_hidden, [n,n]))
+                #print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
+		#comp = tf.subtract(tf.ones([n, n], tf.float32), self.adj)
+		#temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
+		#negscore = tf.fill([n,n], temp+1e-9)
+		#posscore = tf.multiply(self.adj, dec_mat)
 		#dec_out = tf.multiply(self.adj, dec_mat) 
-		dec_out = tf.truediv(posscore, tf.add(posscore, negscore))
-	print "shapes mu sig dec_out prior mu prio sig", enc_mu.shape, enc_sigma.shape, tf.convert_to_tensor(dec_out).shape, prior_mu.shape, prior_sigma.shape
-        return (enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma)
+		#dec_out = tf.truediv(posscore, tf.add(posscore, negscore))
+	print "shapes mu sig dec_out prior mu prio sig", enc_mu.shape, enc_sigma.shape, tf.convert_to_tensor(dec_hidden).shape, prior_mu.shape, prior_sigma.shape
+        return (enc_mu, enc_sigma, dec_hidden, prior_mu, prior_sigma)
 
     def call(self,inputs,n,d,k):
         #with tf.variable_scope(self.name):

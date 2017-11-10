@@ -4,12 +4,13 @@ import numpy as np
 import networkx as nx
 import tensorflow as tf
 from numpy.linalg import svd, qr
+import glob
 
 def degree(A):
     return np.zeros()
 
 
-def construct_feed_dict(adj, features,lr,dropout, k, n, d, decay, placeholders):
+def construct_feed_dict(lr,dropout, k, n, d, decay, placeholders):
     # construct feed dictionary
     feed_dict = dict()
 
@@ -90,15 +91,22 @@ def pickle_load(path):
         loaded_pickle = pickle.load(f)
     return loaded_pickle
 def load_data(filename):
-    G=nx.read_edgelist(filename)
-    n = G.number_of_nodes() 
-    degreemat = np.zeros((n,n), dtype=np.int)
-    edges = G.edges()
-    GC=nx.complete_graph(n)
-    non_edges = list(set(GC.edges()) - set(edges))
-    for u in G.nodes():
-        degreemat[int(u)][int(u)] = G.degree(u)
-    return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
+    path = filename+"*"
+    adjlist = []
+    featurelist = []
+    for fname in glob.glob(path):
+        G=nx.read_edgelist(fname)
+        n = G.number_of_nodes() 
+        degreemat = np.zeros((n,n), dtype=np.int)
+        edges = G.edges()
+        GC=nx.complete_graph(n)
+        non_edges = list(set(GC.edges()) - set(edges))
+        for u in G.nodes():
+            degreemat[int(u)][int(u)] = G.degree(u)
+        adjlist.append(nx.adjacency_matrix(G).todense())
+        featurelist.append(degreemat)
+    return (adjlist, featurelist)
+    #return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
 
 def pickle_save(content, path):
     '''Save the content on the path'''
