@@ -6,7 +6,7 @@ def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False
     #w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.0001))
 
     #w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.zeros_initializer)
-    w_in = tf.Print(w_in,[w_in], message="my Z-values:")
+    w_in = tf.Print(w_in,[w_in], message="my w_in-values:")
     output_list = []
     for i in range(k):
         if i > 0:

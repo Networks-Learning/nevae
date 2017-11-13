@@ -86,8 +86,8 @@ class VAEG(VAEGConfig):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
             self.ll = likelihood_loss
-	    return self.ll
-            #return ( kl_loss + likelihood_loss)
+	    #return self.ll
+            return ( kl_loss + likelihood_loss)
 
 
         self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
@@ -101,13 +101,24 @@ class VAEG(VAEGConfig):
 
         print_vars("trainable_variables")
         self.lr = tf.Variable(self.lr, trainable=False)
-        self.gradient = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4)).compute_gradients(self.cost)
-        self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4).minimize(self.cost)
+        self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr)
+        self.grad = self.train_op.compute_gradients(self.cost)
+        self.grad_placeholder = [(tf.placeholder("float", shape=gr[1].get_shape()), gr[1]) for gr in self.grad]
+                
+        #self.tgv = [self.grad]
+        self.apply_transform_op = self.train_op.apply_gradients(self.grad_placeholder)
+        #self.apply_transform_op = self.train_op.apply_gradients(self.grad)
+
+        #self.lr = tf.Variable(self.lr, trainable=False)
+        #self.gradient = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4).compute_gradients(self.cost)
+        #self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4).minimize(self.cost)
         #self.check_op = tf.add_check_numerics_ops()
 	self.sess = tf.Session()
+        #self.sess.run(tf.initialize_all_variables())
 
     def initialize(self):
         logger.info("Initialization of parameters")
+        #self.sess.run(tf.initialize_all_variables())
         self.sess.run(tf.global_variables_initializer())
 
     def restore(self, savedir):
@@ -146,17 +157,26 @@ class VAEG(VAEGConfig):
             for i in range(len(adj)):
 
                 # Learning rate decay
-                self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
+                #self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
                 
                 feed_dict = construct_feed_dict(lr, dr, self.k, self.n, self.d, decay, placeholders)
                 feed_dict.update({self.adj: adj[i]})
-	        feed_dict.update({self.features: features[i]})
+	        print "Debug", features[i].shape
+                feed_dict.update({self.features: features[i]})
                 feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
+                grad_vals = self.sess.run([g[0] for g in self.grad], feed_dict=feed_dict)
+                for j in xrange(len(self.grad_placeholder)):
+                    feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
+                # compute gradients
+                #grad_vals = self.sess.run([g for (g,v) in self.grad], feed_dict=feed_dict)
+                print 'grad_vals: ',grad_vals
+                # applies the gradients
+                #result = sess.run(apply_transform_op, feed_dict={b: b_val})
 
-
-                input_, train_loss, _, probdict = self.sess.run([self.input_data ,self.cost, self.train_op, self.prob], feed_dict=feed_dict)
+                input_, train_loss, _, probdict= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob], feed_dict=feed_dict)
 
                 iteration += 1
+                #print "Debug Grad", grad
                 if iteration % hparams.log_every == 0 and iteration > 0:
                     print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
 		    #print(probdict)
