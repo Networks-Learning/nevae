@@ -54,6 +54,7 @@ class VAEG(VAEGConfig):
             '''
                 Kullback leibler divergence for two gaussian distributions
             '''
+            print sigma_1.shape, sigma_2.shape
             with tf.variable_scope("kl_gaussisan"):
                 temp_stack = []
                 for i in range(self.n):
@@ -65,22 +66,28 @@ class VAEG(VAEGConfig):
                     temp_stack.append(tf.matmul(tf.matmul(tf.transpose(tf.subtract(mu_2[i],  mu_1[i])), tf.matrix_inverse(tf.square(sigma_2[i]))),tf.subtract(mu_2[i], mu_1[i])))
                 second_term = tf.reshape(tf.stack(temp_stack), [self.n])
                 
-                k = tf.fill([self.n], tf.cast(self.d, tf.float32))
+                #k = tf.fill([self.n], tf.cast(self.d, tf.float32))
+                k = tf.fill([self.n], tf.cast(5, tf.float32))
+
 
                 temp_stack = []
+                #for i in range(self.n):
+                #    temp_stack.append(tf.log(tf.truediv(tf.matrix_determinant(sigma_2[i]),tf.add(tf.matrix_determinant(sigma_1[i]), tf.fill([self.d, self.d], 1e-9)))))
+
                 for i in range(self.n):
-                    temp_stack.append(tf.log(tf.truediv(tf.matrix_determinant(sigma_2[i]),tf.add(tf.matrix_determinant(sigma_1[i]), tf.fill([self.d, self.d], 1e-9)))))
+                    temp_stack.append(tf.log(tf.truediv(tf.matrix_determinant(sigma_2[i]),tf.matrix_determinant(tf.add(sigma_1[i], tf.fill([5, 5], 1e-9))))))
 
                 third_term = tf.stack(temp_stack)
                 
-                print "debug KL", first_term.dtype, second_term.dtype, k.dtype, third_term.dtype
+                print "debug KL", first_term.shape, second_term.shape, k.shape, third_term.shape, sigma_1[0].shape
                 return 0.5 *tf.reduce_sum((tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)))
 
         def get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
             self.ll = likelihood_loss
-	    return ( kl_loss + likelihood_loss)
+	    return self.ll
+            #return ( kl_loss + likelihood_loss)
 
 
         self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
@@ -94,8 +101,9 @@ class VAEG(VAEGConfig):
 
         print_vars("trainable_variables")
         self.lr = tf.Variable(self.lr, trainable=False)
-        self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost)
-        self.check_op = tf.add_check_numerics_ops()
+        self.gradient = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4)).compute_gradients(self.cost)
+        self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4).minimize(self.cost)
+        #self.check_op = tf.add_check_numerics_ops()
 	self.sess = tf.Session()
 
     def initialize(self):
@@ -146,12 +154,12 @@ class VAEG(VAEGConfig):
                 feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
 
 
-                input_, train_loss, _, probdict, op = self.sess.run([self.input_data ,self.cost, self.train_op, self.prob, self.check_op], feed_dict=feed_dict)
+                input_, train_loss, _, probdict = self.sess.run([self.input_data ,self.cost, self.train_op, self.prob], feed_dict=feed_dict)
 
                 iteration += 1
                 if iteration % hparams.log_every == 0 and iteration > 0:
                     print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
-		    print(probdict)
+		    #print(probdict)
                     checkpoint_path = os.path.join(savedir, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))

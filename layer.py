@@ -2,10 +2,11 @@ import tensorflow as tf
 from utils import *
 
 def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
-    #w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.contrib.layers.xavier_initializer())
-    w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.0001))
+    w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.contrib.layers.xavier_initializer())
+    #w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.0001))
 
     #w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.zeros_initializer)
+    w_in = tf.Print(w_in,[w_in], message="my Z-values:")
     output_list = []
     for i in range(k):
         if i > 0:
@@ -39,9 +40,9 @@ def fc_layer(input_, output_size, activation = None, batch_norm = False, istrain
             defaults to be None then scope becomes "fc"
     '''
     with tf.variable_scope(scope or "fc"):
-        #w = tf.get_variable(name="w", shape = [get_shape(input_)[1], output_size], initializer=tf.contrib.layers.xavier_initializer())
-        w = tf.get_variable(name="w", shape = [get_shape(input_)[1], output_size], initializer=tf.constant_initializer(0.0001))
-
+        w = tf.get_variable(name="w", shape = [get_shape(input_)[1], output_size], initializer=tf.contrib.layers.xavier_initializer())
+        #w = tf.get_variable(name="w", shape = [get_shape(input_)[1], output_size], initializer=tf.constant_initializer(0.0001))
+        w = tf.Print(w,[w], message="my W-values:"+scope)
         if batch_norm:
             norm = tf.contrib.layers.batch_norm(tf.matmul(input_, w) , center=True, scale=True, decay = 0.8, is_training=istrain, scope='batch_norm')
             if activation is None:
