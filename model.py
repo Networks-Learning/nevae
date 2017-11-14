@@ -50,10 +50,40 @@ class VAEG(VAEGConfig):
                 ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))))
             return (-ll)
 
-        def kl_gaussian(mu_1, sigma_1, mu_2, sigma_2):
+        def kl_gaussian(mu_1, sigma_1,debug_sigma, mu_2, sigma_2):
             '''
                 Kullback leibler divergence for two gaussian distributions
             '''
+            print sigma_1.shape, sigma_2.shape
+            with tf.variable_scope("kl_gaussisan"):
+                temp_stack = []
+                for i in range(self.n):
+                    temp_stack.append(tf.square(sigma_1[i]))
+                first_term = tf.trace(tf.stack(temp_stack))
+
+                temp_stack = []
+                for i in range(self.n):
+                    temp_stack.append(tf.matmul(tf.transpose( mu_1[i]),  mu_1[i]))
+                second_term = tf.reshape(tf.stack(temp_stack), [self.n])
+
+                #k = tf.fill([self.n], tf.cast(self.d, tf.float32))
+                k = tf.fill([self.n], tf.cast(5, tf.float32))
+
+
+                temp_stack = []
+                #for i in range(self.n):
+                #    temp_stack.append(tf.log(tf.truediv(tf.matrix_determinant(sigma_2[i]),tf.add(tf.matrix_determinant(sigma_1[i]), tf.fill([self.d, self.d], 1e-9)))))
+
+                for i in range(self.n):
+                    temp_stack.append(tf.reduce_prod(tf.square(debug_sigma[i])))
+
+                print "Debug", tf.stack(temp_stack).shape
+                third_term = tf.log(tf.add(tf.stack(temp_stack),tf.fill([self.n],1e-09)))
+
+                print "debug KL", first_term.shape, second_term.shape, k.shape, third_term.shape, sigma_1[0].shape
+                return 0.5 *tf.reduce_sum((tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)))
+        '''
+        def kl_gaussian(mu_1, sigma_1, mu_2, sigma_2):
             print sigma_1.shape, sigma_2.shape
             with tf.variable_scope("kl_gaussisan"):
                 temp_stack = []
@@ -81,9 +111,9 @@ class VAEG(VAEGConfig):
                 
                 print "debug KL", first_term.shape, second_term.shape, k.shape, third_term.shape, sigma_1[0].shape
                 return 0.5 *tf.reduce_sum((tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)))
-
-        def get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out):
-            kl_loss = kl_gaussian(enc_mu, enc_sigma, prior_mu, prior_sigma)  # KL_divergence loss
+        '''
+        def get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out):
+            kl_loss = kl_gaussian(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
             self.ll = likelihood_loss
 	    #return self.ll
@@ -95,9 +125,9 @@ class VAEG(VAEGConfig):
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
 
 	self.cell = VAEGCell(self.adj, self.features)
-        enc_mu, enc_sigma, dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
+        enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
 	self.prob = dec_out
-        self.cost = get_lossfunc(enc_mu, enc_sigma, prior_mu, prior_sigma, dec_out)
+        self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out)
 
         print_vars("trainable_variables")
         self.lr = tf.Variable(self.lr, trainable=False)
