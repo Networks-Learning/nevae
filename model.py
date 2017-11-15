@@ -130,13 +130,14 @@ class VAEG(VAEGConfig):
         self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out)
 
         print_vars("trainable_variables")
-        self.lr = tf.Variable(self.lr, trainable=False)
+        # self.lr = tf.Variable(self.lr, trainable=False)
         self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr)
         self.grad = self.train_op.compute_gradients(self.cost)
         self.grad_placeholder = [(tf.placeholder("float", shape=gr[1].get_shape()), gr[1]) for gr in self.grad]
                 
         #self.tgv = [self.grad]
-        self.apply_transform_op = self.train_op.apply_gradients(self.grad_placeholder)
+        # self.apply_transform_op = self.train_op.apply_gradients(self.grad_placeholder)
+        self.apply_transform_op = self.train_op.apply_gradients(self.grad)
         #self.apply_transform_op = self.train_op.apply_gradients(self.grad)
 
         #self.lr = tf.Variable(self.lr, trainable=False)
@@ -199,7 +200,7 @@ class VAEG(VAEGConfig):
                     feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
                 # compute gradients
                 #grad_vals = self.sess.run([g for (g,v) in self.grad], feed_dict=feed_dict)
-                print 'grad_vals: ',grad_vals
+                print 'grad_vals: ',grad_vals[0]
                 # applies the gradients
                 #result = sess.run(apply_transform_op, feed_dict={b: b_val})
 
@@ -219,23 +220,21 @@ class VAEG(VAEGConfig):
                 negative loglikelihood of the edges
                 '''
                 ll = 0
-             
-                #prob_dict.shape[0]
-                #with tf.variable_scope('NLL'):
                 dec_mat = tf.exp(tf.reshape(prob_dict, [n, n]))
-                #print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
-		comp = tf.subtract(tf.ones([n, n], tf.float32), adj)
+                print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
+		comp = tf.subtract(tf.ones([n, n], tf.float32), self.adj)
 		temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
 		negscore = tf.fill([n,n], temp+1e-9)
-		posscore = tf.multiply(adj, dec_mat)
+		posscore = tf.multiply(self.adj, dec_mat)
 		#dec_out = tf.multiply(self.adj, dec_mat) 
 		softmax_out = tf.truediv(posscore, tf.add(posscore, negscore))
 
                 #ll = tf.reduce_sum(tf.multiply(self.adj, prob_dict))
-                ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(adj, softmax_out), tf.fill([n,n], 1e-9))))
+                ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))))
+     
                 return (-ll)
 
-    def samplegraph(self, hparams, placeholders, num=10, outdir=None):
+    def samplegraph(self, hparams, placeholders, num=103, outdir=None):
         '''
         Args :
             num - int
@@ -250,15 +249,17 @@ class VAEG(VAEGConfig):
             for j in range(self.n):
                 if i!=j :
                     list_edges.append((i,j))
-        candidate_edges = [ list_edges[i] for i in random.sample(range(0, self.n * self.n -self.n), num)]
-        adj = np.zeros([self.n, self.n])
-        deg = np.zeros([self.n, self.n])
+        adj = proxy('graph/test0.edgelist')
+        #print "Debug adj", adj.shape, adj
+        #candidate_edges =[ list_edges[i] for i in random.sample(range(0, self.n * self.n -self.n), num)]
+        #adj = np.zeros([self.n, self.n])
+        deg = np.zeros([self.n, 1], dtype=np.float)
 
-        for (u,v) in candidate_edges:
-            adj[u][v] = 1
+        #for (u,v) in candidate_edges:
+        #    adj[u][v] = 1
 
         for i in range(self.n):
-            deg[i][i] = np.sum(adj[i])
+            deg[i][0] = 2 * np.sum(adj[i])/(self.n*(self.n - 1))
 
         feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
         feed_dict.update({self.adj: adj})
@@ -267,7 +268,14 @@ class VAEG(VAEGConfig):
 
         prob, ll = self.sess.run([self.prob, self.ll],feed_dict=feed_dict )
         #score = self.neg_loglikelihood(tf.convert_to_tensor(prob).todense(), adj, self.n) 
-        print ll
-        for (u,v) in candidate_edges:
-            print u,v,"{ }"
+        with open('outputgraph/test1', 'a') as f:
+            f.write(str(ll)+'\n')
+        #for (u,v) in candidate_edges:
+        for u in range(self.n):
+            for v in range(u,self.n):
+                #print u,v, adj[u][v]
+                if int(adj[u][v]) == 1:
+                    with open('outputgraph/test1', 'a') as f:
+                        f.write(str(u)+' '+str(v)+' {}'+'\n')
+                    print u,v,"{}"
         #return chunks, mus, sigmas

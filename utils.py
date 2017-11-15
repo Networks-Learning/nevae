@@ -98,19 +98,37 @@ def load_data(filename):
         G=nx.read_edgelist(fname)
         n = G.number_of_nodes() 
         #degreemat = np.zeros((n,n), dtype=np.int)
-        degreemat = np.zeros((n,1), dtype=np.int)
+        degreemat = np.zeros((n,1), dtype=np.float)
 
         edges = G.edges()
         GC=nx.complete_graph(n)
         non_edges = list(set(GC.edges()) - set(edges))
         for u in G.nodes():
             #degreemat[int(u)][int(u)] = G.degree(u)
-            degreemat[int(u)][0] = G.degree(u)
+            degreemat[int(u)][0] = (G.degree(u)*2)/(n *(n-1))
 
         adjlist.append(nx.adjacency_matrix(G).todense())
         featurelist.append(degreemat)
     return (adjlist, featurelist)
     #return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
+
+def proxy(filename):
+    #for fname in glob.glob(path):
+        G=nx.read_edgelist(filename)
+        n = G.number_of_nodes() 
+        #degreemat = np.zeros((n,n), dtype=np.int)
+        degreemat = np.zeros((n,1), dtype=np.float)
+
+        edges = G.edges()
+        GC=nx.complete_graph(n)
+        non_edges = list(set(GC.edges()) - set(edges))
+        for u in G.nodes():
+            #degreemat[int(u)][int(u)] = G.degree(u)
+            degreemat[int(u)][0] = (G.degree(u)*2)/(n *(n-1))
+
+        #adjlist.append(nx.adjacency_matrix(G).todense())
+        #featurelist.append(degreemat)
+        return np.array(nx.adjacency_matrix(G).todense())
 
 def pickle_save(content, path):
     '''Save the content on the path'''

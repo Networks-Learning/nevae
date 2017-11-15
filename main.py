@@ -1,4 +1,4 @@
-from utils import create_dir, pickle_save, print_vars, load_data, get_shape
+from utils import create_dir, pickle_save, print_vars, load_data, get_shape, proxy
 from config import SAVE_DIR, VAEGConfig
 from datetime import datetime
 from cell import VAEGCell
@@ -63,10 +63,12 @@ if __name__ == '__main__':
     print len(features)
 
     #print num_nodes, num_features
-    model = VAEG(hparams, placeholders, num_nodes, num_features)
-    model.initialize()
-    model.train(placeholders, hparams, adj, features)
+    #model = VAEG(hparams, placeholders, num_nodes, num_features)
+    #model.initialize()
+    #model.train(placeholders, hparams, adj, features)
     #Test code
-    #model2 = VAEG(hparams, placeholders, 10, 10)
-    #model2.restore(hparams.out_dir)
-    #model2.samplegraph(hparams, placeholders,20)
+    #adj = proxy('graph/test0.edgelist')
+    #print adj.shape, adj[0], adj[0][0]
+    model2 = VAEG(hparams, placeholders, 20, 1)
+    model2.restore(hparams.out_dir)
+    model2.samplegraph(hparams, placeholders,103)
