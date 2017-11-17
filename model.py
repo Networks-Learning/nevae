@@ -54,7 +54,7 @@ class VAEG(VAEGConfig):
 
                 #dec_out = tf.multiply(self.adj, dec_mat) 
 		softmax_out = tf.truediv(posscore, tf.add(posscore, negscore))
-                ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))))
+                ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))),1)
             return (-ll)
 
         def kl_gaussian(mu_1, sigma_1,debug_sigma, mu_2, sigma_2):
@@ -88,13 +88,14 @@ class VAEG(VAEGConfig):
                 third_term = tf.log(tf.add(tf.stack(temp_stack),tf.fill([self.n],1e-09)))
 
                 print "debug KL", first_term.shape, second_term.shape, k.shape, third_term.shape, sigma_1[0].shape
-                return 0.5 *tf.reduce_sum((tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)))
+                #return 0.5 *tf.reduce_sum((
+                return 0.5 * tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)
         
 	def get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
             self.ll = likelihood_loss
-            return ( kl_loss + likelihood_loss)
+            return tf.reduce_mean(kl_loss + likelihood_loss)
 
 
         self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
@@ -102,7 +103,7 @@ class VAEG(VAEGConfig):
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
 
 	self.cell = VAEGCell(self.adj, self.features)
-        enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
+        self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k)
 	self.prob = dec_out
         self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out)
 
@@ -111,11 +112,11 @@ class VAEG(VAEGConfig):
         self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr)
         self.grad = self.train_op.compute_gradients(self.cost)
         self.grad_placeholder = [(tf.placeholder("float", shape=gr[1].get_shape()), gr[1]) for gr in self.grad]
-        self.capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in self.grad]  
+        #self.capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in self.grad]  
         #self.tgv = [self.grad]
         # self.apply_transform_op = self.train_op.apply_gradients(self.grad_placeholder)
-        self.apply_transform_op = self.train_op.apply_gradients(self.capped_gvs)
-        #self.apply_transform_op = self.train_op.apply_gradients(self.grad)
+        #self.apply_transform_op = self.train_op.apply_gradients(self.capped_gvs)
+        self.apply_transform_op = self.train_op.apply_gradients(self.grad)
 
         #self.lr = tf.Variable(self.lr, trainable=False)
         #self.gradient = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4).compute_gradients(self.cost)
@@ -166,10 +167,11 @@ class VAEG(VAEGConfig):
                 for j in xrange(len(self.grad_placeholder)):
                     feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
 
-                input_, train_loss, _, probdict= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob], feed_dict=feed_dict)
+                input_, train_loss, _, probdict,cx= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob, self.c_x], feed_dict=feed_dict)
 
                 iteration += 1
-                #print "Debug Grad", grad
+                print "Debug Grad", grad_vals[0]
+                #print "Debug CX", cx
                 if iteration % hparams.log_every == 0 and iteration > 0:
                     print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
 		    #print(probdict)

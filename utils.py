@@ -106,8 +106,8 @@ def load_data(filename):
         GC=nx.complete_graph(n)
         non_edges = list(set(GC.edges()) - set(edges))
         for u in G.nodes():
-            #degreemat[int(u)][int(u)] = G.degree(u)
-            degreemat[int(u)][0] = (G.degree(u)*2)/(n *(n-1))
+            #degreemat[int(u)][0] = int(G.degree(u)) * 2.0 / n
+            degreemat[int(u)][0] = (G.degree(u)*2.0)/(n *(n-1))
 
         adjlist.append(np.array(nx.adjacency_matrix(G).todense()))
         featurelist.append(degreemat)

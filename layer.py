@@ -17,29 +17,33 @@ def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False
                     output_list.append(fc_layer(feature, 5))
     
     return tf.stack(output_list)
-
+'''
+'''
 def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
+   with tf.variable_scope("input", reuse=tf.AUTO_REUSE):
+
     w_in = tf.get_variable(name="w_in", shape=[d, 5], initializer=tf.contrib.layers.xavier_initializer())
-    #w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.5))
+    #w_in = tf.get_variable(name="w_in", shape=[d,5], initializer=tf.constant_initializer(0.0005))
 
     #w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.zeros_initializer)
-    w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.5))
+    #w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.5))
     w_in = tf.Print(w_in,[w_in], message="my w_in-values:")
     output_list = []
     for i in range(k):
         #fc_layer(input_, output_size, activation = None, batch
         if i > 0:
-            #c_mat[i] = tf.add(tf.transpose(tf.matmul(w_in[i], tf.transpose(feature))),tf.matmul(adj, c_mat[i-1]))
+            #c_mat[i] = tf.add(tf.transpose(tf.matmul(w_in, tf.transpose(feature))),tf.matmul(adj, c_mat[i-1]))
 	    output_list.append( tf.add(tf.matmul(feature, w_in),tf.matmul(adj, output_list[i-1])))
         else:
             #c_mat[i] 
-	    output_list.append(tf.matmul(feature, w_in))
+	    output_list.append(tf.matmul(feature, w_in[i]))
     
     return tf.stack(output_list)
 '''
+
 #'''
 def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
-    w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.contrib.layers.xavier_initializer())
+    w_in = tf.get_variable(name="w_in", shape=[k, d, 5], initializer=tf.contrib.layers.xavier_initializer())
     #w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.5))
 
     #w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.zeros_initializer)
@@ -49,10 +53,14 @@ def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False
         #fc_layer(input_, output_size, activation = None, batch
         if i > 0:
             #c_mat[i] = tf.add(tf.transpose(tf.matmul(w_in[i], tf.transpose(feature))),tf.matmul(adj, c_mat[i-1]))
-	    output_list.append( tf.add(tf.transpose(tf.matmul(w_in[i], tf.transpose(feature))),tf.matmul(adj, output_list[i-1])))
+            output_list.append( tf.add(tf.matmul(feature, w_in[i]),tf.matmul(adj, output_list[i-1])))
+
+	    #output_list.append( tf.add(tf.transpose(tf.matmul(w_in[i], tf.transpose(feature))),tf.matmul(adj, output_list[i-1])))
         else:
             #c_mat[i] 
-	    output_list.append(tf.transpose(tf.matmul(w_in[i], tf.transpose(feature))))
+            output_list.append(tf.matmul(feature, w_in[i]))
+
+	    #output_list.append(tf.transpose(tf.matmul(w_in[i], tf.transpose(feature))))
     
     return tf.stack(output_list)
 #'''

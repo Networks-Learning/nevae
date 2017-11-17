@@ -66,7 +66,7 @@ if __name__ == '__main__':
     num_nodes = adj[0].shape[0]
     num_features = features[0].shape[1]
     print hparams.generation_file
-    print len(features)
+    print features
 
     #print num_nodes, num_features
     model = VAEG(hparams, placeholders, num_nodes, num_features)
