@@ -18,12 +18,12 @@ def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False
     
     return tf.stack(output_list)
 
-
 def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
     w_in = tf.get_variable(name="w_in", shape=[d, 5], initializer=tf.contrib.layers.xavier_initializer())
     #w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.5))
 
     #w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.zeros_initializer)
+    w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.5))
     w_in = tf.Print(w_in,[w_in], message="my w_in-values:")
     output_list = []
     for i in range(k):
@@ -62,7 +62,6 @@ def fc_layer(input_, output_size, activation = None, batch_norm = False, istrain
     fully convlolution layer
     Args :
         input_  - 2D tensor
-            general shape : [batch, input_size]
         output_size - list of the sizes for the output
             shape of output 2D tensor
         activation - activation function

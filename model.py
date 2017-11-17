@@ -54,8 +54,6 @@ class VAEG(VAEGConfig):
 
                 #dec_out = tf.multiply(self.adj, dec_mat) 
 		softmax_out = tf.truediv(posscore, tf.add(posscore, negscore))
-
-                #ll = tf.reduce_sum(tf.multiply(self.adj, prob_dict))
                 ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))))
             return (-ll)
 
@@ -91,41 +89,11 @@ class VAEG(VAEGConfig):
 
                 print "debug KL", first_term.shape, second_term.shape, k.shape, third_term.shape, sigma_1[0].shape
                 return 0.5 *tf.reduce_sum((tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)))
-        '''
-        def kl_gaussian(mu_1, sigma_1, mu_2, sigma_2):
-            print sigma_1.shape, sigma_2.shape
-            with tf.variable_scope("kl_gaussisan"):
-                temp_stack = []
-                for i in range(self.n):
-                    temp_stack.append(tf.matmul(tf.matrix_inverse(tf.square(sigma_2[i])), tf.square(sigma_1[i])))
-                first_term = tf.trace(tf.stack(temp_stack))
-                
-                temp_stack = []
-                for i in range(self.n):
-                    temp_stack.append(tf.matmul(tf.matmul(tf.transpose(tf.subtract(mu_2[i],  mu_1[i])), tf.matrix_inverse(tf.square(sigma_2[i]))),tf.subtract(mu_2[i], mu_1[i])))
-                second_term = tf.reshape(tf.stack(temp_stack), [self.n])
-                
-                #k = tf.fill([self.n], tf.cast(self.d, tf.float32))
-                k = tf.fill([self.n], tf.cast(5, tf.float32))
-
-
-                temp_stack = []
-                #for i in range(self.n):
-                #    temp_stack.append(tf.log(tf.truediv(tf.matrix_determinant(sigma_2[i]),tf.add(tf.matrix_determinant(sigma_1[i]), tf.fill([self.d, self.d], 1e-9)))))
-
-                for i in range(self.n):
-                    temp_stack.append(tf.log(tf.truediv(tf.matrix_determinant(sigma_2[i]),tf.matrix_determinant(tf.add(sigma_1[i], tf.fill([5, 5], 1e-9))))))
-
-                third_term = tf.stack(temp_stack)
-                
-                print "debug KL", first_term.shape, second_term.shape, k.shape, third_term.shape, sigma_1[0].shape
-                return 0.5 *tf.reduce_sum((tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)))
-        '''
-        def get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out):
+        
+	def get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
             self.ll = likelihood_loss
-	    #return self.ll
             return ( kl_loss + likelihood_loss)
 
 
@@ -154,7 +122,6 @@ class VAEG(VAEGConfig):
         #self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4).minimize(self.cost)
         #self.check_op = tf.add_check_numerics_ops()
 	self.sess = tf.Session()
-        #self.sess.run(tf.initialize_all_variables())
 
     def initialize(self):
         logger.info("Initialization of parameters")
@@ -184,16 +151,7 @@ class VAEG(VAEGConfig):
             print("Load the model from %s" % ckpt.model_checkpoint_path)
 
         iteration = 0
-        #feed_dict = construct_feed_dict(self.adj, self.features, lr, dr, self.k, self.n, self.d, decay, placeholders)
-        #feed_dict.update({self.adj: adj})
-	#feed_dict.update({self.features: features})
-	#print("Debug features")
-	#print features
-	#feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
-
-        #for i in range(k):
         for epoch in range(num_epochs):
-
             for i in range(len(adj)):
 
                 # Learning rate decay
@@ -207,11 +165,6 @@ class VAEG(VAEGConfig):
                 grad_vals = self.sess.run([g[0] for g in self.grad], feed_dict=feed_dict)
                 for j in xrange(len(self.grad_placeholder)):
                     feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
-                # compute gradients
-                #grad_vals = self.sess.run([g for (g,v) in self.grad], feed_dict=feed_dict)
-                print 'grad_vals: ',grad_vals[0:5]
-                # applies the gradients
-                #result = sess.run(apply_transform_op, feed_dict={b: b_val})
 
                 input_, train_loss, _, probdict= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob], feed_dict=feed_dict)
 
@@ -224,24 +177,6 @@ class VAEG(VAEGConfig):
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))
 
-    def neg_loglikelihood(self, prob_dict, adj,n):
-                '''
-                negative loglikelihood of the edges
-                '''
-                ll = 0
-                dec_mat = tf.exp(tf.reshape(prob_dict, [n, n]))
-                print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
-		comp = tf.subtract(tf.ones([n, n], tf.float32), self.adj)
-		temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
-		negscore = tf.fill([n,n], temp+1e-9)
-		posscore = tf.multiply(self.adj, dec_mat)
-		#dec_out = tf.multiply(self.adj, dec_mat) 
-		softmax_out = tf.truediv(posscore, tf.add(posscore, negscore))
-
-                #ll = tf.reduce_sum(tf.multiply(self.adj, prob_dict))
-                ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))))
-     
-                return (-ll)
 
     def samplegraph(self, hparams, placeholders, num=103, outdir=None):
         '''

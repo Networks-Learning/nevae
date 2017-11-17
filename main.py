@@ -74,7 +74,6 @@ if __name__ == '__main__':
     model.train(placeholders, hparams, adj, features)
     
     #Test code
-    
-    #model2 = VAEG(hparams, placeholders, 30, 1)
+    #model2 = VAEG(hparams, placeholders, 20, 1)
     #model2.restore(hparams.out_dir)
-    #model2.samplegraph(hparams, placeholders,56)
+    #model2.samplegraph(hparams, placeholders,103)
