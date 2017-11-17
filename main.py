@@ -63,12 +63,11 @@ if __name__ == '__main__':
     print len(features)
 
     #print num_nodes, num_features
-    #model = VAEG(hparams, placeholders, num_nodes, num_features)
-    #model.initialize()
-    #model.train(placeholders, hparams, adj, features)
+    model = VAEG(hparams, placeholders, num_nodes, num_features)
+    model.initialize()
+    model.train(placeholders, hparams, adj, features)
+    
     #Test code
-    #adj = proxy('graph/test0.edgelist')
-    #print adj.shape, adj[0], adj[0][0]
-    model2 = VAEG(hparams, placeholders, 20, 1)
-    model2.restore(hparams.out_dir)
-    model2.samplegraph(hparams, placeholders,103)
+    #model2 = VAEG(hparams, placeholders, 20, 1)
+    #model2.restore(hparams.out_dir)
+    #model2.samplegraph(hparams, placeholders,103)
