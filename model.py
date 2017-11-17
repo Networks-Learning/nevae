@@ -37,13 +37,22 @@ class VAEG(VAEGConfig):
             '''
             ll = 0
             with tf.variable_scope('NLL'):
-                dec_mat = tf.exp(tf.reshape(prob_dict, [self.n, self.n]))
+                dec_mat = tf.exp(tf.minimum(tf.reshape(prob_dict, [self.n, self.n]),tf.fill([self.n, self.n], 10.0)))
+                dec_mat = tf.Print(dec_mat, [dec_mat], message="my decscore values:")
+
+
                 print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
 		comp = tf.subtract(tf.ones([self.n, self.n], tf.float32), self.adj)
+                comp = tf.Print(comp, [comp], message="my comp values:")
+
 		temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
 		negscore = tf.fill([self.n,self.n], temp+1e-9)
+                negscore = tf.Print(negscore, [negscore], message="my negscore values:")
+
 		posscore = tf.multiply(self.adj, dec_mat)
-		#dec_out = tf.multiply(self.adj, dec_mat) 
+                posscore = tf.Print(posscore, [posscore], message="my posscore values:")
+
+                #dec_out = tf.multiply(self.adj, dec_mat) 
 		softmax_out = tf.truediv(posscore, tf.add(posscore, negscore))
 
                 #ll = tf.reduce_sum(tf.multiply(self.adj, prob_dict))
@@ -134,10 +143,10 @@ class VAEG(VAEGConfig):
         self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr)
         self.grad = self.train_op.compute_gradients(self.cost)
         self.grad_placeholder = [(tf.placeholder("float", shape=gr[1].get_shape()), gr[1]) for gr in self.grad]
-                
+        self.capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in self.grad]  
         #self.tgv = [self.grad]
         # self.apply_transform_op = self.train_op.apply_gradients(self.grad_placeholder)
-        self.apply_transform_op = self.train_op.apply_gradients(self.grad)
+        self.apply_transform_op = self.train_op.apply_gradients(self.capped_gvs)
         #self.apply_transform_op = self.train_op.apply_gradients(self.grad)
 
         #self.lr = tf.Variable(self.lr, trainable=False)
@@ -200,7 +209,7 @@ class VAEG(VAEGConfig):
                     feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
                 # compute gradients
                 #grad_vals = self.sess.run([g for (g,v) in self.grad], feed_dict=feed_dict)
-                print 'grad_vals: ',grad_vals[0]
+                print 'grad_vals: ',grad_vals[0:5]
                 # applies the gradients
                 #result = sess.run(apply_transform_op, feed_dict={b: b_val})
 
@@ -246,17 +255,22 @@ class VAEG(VAEGConfig):
         '''
         list_edges = []
         for i in range(self.n):
-            for j in range(self.n):
+            for j in range(i,self.n):
                 if i!=j :
                     list_edges.append((i,j))
-        adj = proxy('graph/test0.edgelist')
+        #adj = proxy('graph04/test0.edgelist', perm=True)
+        adj = proxy('powerlaw/0.edgelist', perm=True)
+        print np.sum(adj)
+        
         #print "Debug adj", adj.shape, adj
-        #candidate_edges =[ list_edges[i] for i in random.sample(range(0, self.n * self.n -self.n), num)]
+        candidate_edges =[ list_edges[i] for i in random.sample(range(len(list_edges)), num)]
         #adj = np.zeros([self.n, self.n])
+        #print "Len()", len(candidate_edges)
         deg = np.zeros([self.n, 1], dtype=np.float)
 
         #for (u,v) in candidate_edges:
         #    adj[u][v] = 1
+        #    adj[v][u] = 1
 
         for i in range(self.n):
             deg[i][0] = 2 * np.sum(adj[i])/(self.n*(self.n - 1))
@@ -265,17 +279,20 @@ class VAEG(VAEGConfig):
         feed_dict.update({self.adj: adj})
 	feed_dict.update({self.features: deg})
         feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
-
         prob, ll = self.sess.run([self.prob, self.ll],feed_dict=feed_dict )
+        #print prob
         #score = self.neg_loglikelihood(tf.convert_to_tensor(prob).todense(), adj, self.n) 
-        with open('outputgraph/test1', 'a') as f:
+        with open(hparams.generation_file+'/ll.txt', 'a') as f:
             f.write(str(ll)+'\n')
+        print "Debug n", self.n
         #for (u,v) in candidate_edges:
+        print adj
         for u in range(self.n):
-            for v in range(u,self.n):
+            for v in range(u+1,self.n):
                 #print u,v, adj[u][v]
-                if int(adj[u][v]) == 1:
-                    with open('outputgraph/test1', 'a') as f:
+                #if(u!=v):
+                if adj[u][v] == 1:
+                    with open(hparams.generation_file+'candidate3.txt', 'a') as f:
                         f.write(str(u)+' '+str(v)+' {}'+'\n')
-                    print u,v,"{}"
+                    #print u,v,"{}"
         #return chunks, mus, sigmas

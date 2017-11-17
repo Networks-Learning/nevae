@@ -33,6 +33,9 @@ def add_arguments(parser):
     parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
     parser.add_argument("--graph_file", type=str, default=None,
                         help="The file where the graph structure is saved")
+    parser.add_argument("--generation_file", type=str, default=None,
+                        help="The sampled file to be stored")
+
     parser.add_argument("--out_dir", type=str, default=None,
                         help="Store log/model files.")
 
@@ -42,6 +45,8 @@ def create_hparams(flags):
       # Data
       graph_file=flags.graph_file,
       out_dir=flags.out_dir,
+      generation_file=flags.generation_file,
+
       # training
       learning_rate=flags.learning_rate,
       decay_rate=flags.decay_rate,
@@ -60,15 +65,16 @@ if __name__ == '__main__':
     adj, features = load_data(hparams.graph_file)
     num_nodes = adj[0].shape[0]
     num_features = features[0].shape[1]
+    print hparams.generation_file
     print len(features)
 
     #print num_nodes, num_features
-    #model = VAEG(hparams, placeholders, num_nodes, num_features)
-    #model.initialize()
-    #model.train(placeholders, hparams, adj, features)
+    model = VAEG(hparams, placeholders, num_nodes, num_features)
+    model.initialize()
+    model.train(placeholders, hparams, adj, features)
+    
     #Test code
-    #adj = proxy('graph/test0.edgelist')
-    #print adj.shape, adj[0], adj[0][0]
-    model2 = VAEG(hparams, placeholders, 20, 1)
-    model2.restore(hparams.out_dir)
-    model2.samplegraph(hparams, placeholders,103)
+    
+    #model2 = VAEG(hparams, placeholders, 30, 1)
+    #model2.restore(hparams.out_dir)
+    #model2.samplegraph(hparams, placeholders,56)

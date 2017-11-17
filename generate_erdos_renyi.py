@@ -17,11 +17,13 @@ def random_walk(G, seed, k):
 		i += 1
 	return walk
 		
-def create_graph(n,p):
-	G = nx.erdos_renyi_graph(n, p)
-	#nx.draw_networkx(G, with_labels= True)
-	print G.nodes()
-	print G.neighbors(0)
+def create_graph(n,m,p):
+	#G = nx.erdos_renyi_graph(n, p)
+	#G = nx.barabasi_albert_graph(n, m)
+        G = nx.powerlaw_cluster_graph(n,m,p)
+        #nx.draw_networkx(G, with_labels= True)
+	#print G.nodes()
+	#print G.neighbors(0)
 	#plt.axis('off')
 	#plt.show()
 	return G
@@ -30,6 +32,9 @@ def get_params():
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     	parser.add_argument('--n', type=int, default=10,
 			help='number of nodes in the graph')
+        parser.add_argument('--m', type=int, default=10,
+			help='number of edges in the graph')
+
         parser.add_argument('--p', type=float, default=0.1,
                         help='probability')
 	parser.add_argument('--k', type=int, default=5,
@@ -37,6 +42,9 @@ def get_params():
 
         parser.add_argument('--N', type=int, default=5,
                             help='Number graph with the same parameter you want to learn')
+        parser.add_argument('--file', type=str, default='graph/',
+                            help='File to store the graph')
+
 	params = parser.parse_args()
 	return params
 	
@@ -46,9 +54,10 @@ if __name__ == "__main__":
         #G = create_graph(params.n, params.p)
 	#A = nx.adjacency_matrix(G)
         for i in range(params.N):
-            G = create_graph(params.n, params.p)
+            G = create_graph(params.n, params.m, params.p)
 	    A = nx.adjacency_matrix(G)
-            fh = open("graph/test"+str(i)+".edgelist" , "wb")
+            #print A
+            fh = open(params.file+str(i)+".edgelist" , "wb")
             nx.write_edgelist(G, fh)
             fh.write("\n")
 	#fh.close()

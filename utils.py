@@ -95,7 +95,9 @@ def load_data(filename):
     adjlist = []
     featurelist = []
     for fname in glob.glob(path):
-        G=nx.read_edgelist(fname)
+        f = open(fname, 'r')
+        G=nx.read_edgelist(f, nodetype=int)
+        f.close()
         n = G.number_of_nodes() 
         #degreemat = np.zeros((n,n), dtype=np.int)
         degreemat = np.zeros((n,1), dtype=np.float)
@@ -107,27 +109,34 @@ def load_data(filename):
             #degreemat[int(u)][int(u)] = G.degree(u)
             degreemat[int(u)][0] = (G.degree(u)*2)/(n *(n-1))
 
-        adjlist.append(nx.adjacency_matrix(G).todense())
+        adjlist.append(np.array(nx.adjacency_matrix(G).todense()))
         featurelist.append(degreemat)
     return (adjlist, featurelist)
     #return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
 
-def proxy(filename):
+def proxy(filename, perm = False):
     #for fname in glob.glob(path):
-        G=nx.read_edgelist(filename)
-        n = G.number_of_nodes() 
-        #degreemat = np.zeros((n,n), dtype=np.int)
-        degreemat = np.zeros((n,1), dtype=np.float)
-
+        print "filename", filename
+        f = open(filename, 'r')
+        G=nx.read_edgelist(f, nodetype=int)
+        n = G.number_of_nodes()
         edges = G.edges()
-        GC=nx.complete_graph(n)
-        non_edges = list(set(GC.edges()) - set(edges))
-        for u in G.nodes():
-            #degreemat[int(u)][int(u)] = G.degree(u)
-            degreemat[int(u)][0] = (G.degree(u)*2)/(n *(n-1))
+        #print "edges", nx.adjacency_matrix(G)
+        if perm == True:
+            p = np.identity(n, dtype=np.int)
+            np.random.shuffle(p)
+        
+            #print perm
+            adj = np.array(nx.adjacency_matrix(G).todense())
+            #temp = adj[10]
+            #adj[10] = adj[15]
+            #adj[15] = temp
 
-        #adjlist.append(nx.adjacency_matrix(G).todense())
-        #featurelist.append(degreemat)
+            #temp = adj[:,10]
+            #adj[:,10] = adj[:,15]
+            #adj[:,15] = temp
+            adj = np.matmul(np.matmul(p,adj),p.transpose())
+            return adj
         return np.array(nx.adjacency_matrix(G).todense())
 
 def pickle_save(content, path):

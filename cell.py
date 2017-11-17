@@ -45,6 +45,8 @@ class VAEGCell(object):
         #d = get_shape(self.features)[1]
         with tf.variable_scope(scope or type(self).__name__):
             c_x = input_layer(c_x, self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False, scope=None)
+            c_x = tf.Print(c_x,[c_x], message="my c_x-values:")
+
             #print "c_x",c_x.shape
 	    with tf.variable_scope("Prior"):
                 #prior_mu = tf.get_variable(name="prior_mu", shape=[n,d,1], initializer=tf.zeros_initializer())
@@ -70,13 +72,13 @@ class VAEGCell(object):
 	        enc_sigma = tf.matrix_diag(tf.transpose(fc_layer(enc_hidden, d, activation=tf.nn.relu, scope='sigma'), name="enc_sigma"))
                 '''
 
-                enc_mu = fc_layer(enc_hidden, 5, scope='mu')
+                enc_mu = fc_layer(enc_hidden, 5,activation=tf.nn.relu, scope='mu')
 		enc_mu = tf.reshape(enc_mu, [n,5,1])
                 enc_mu = tf.Print(enc_mu,[enc_mu], message="my enc_mu-values:")
 
                 # output will be n X 1 then convert that to a diagonal matrix
                 # enc_sigma = tf.matrix_diag(tf.transpose(fc_layer(enc_hidden, d, activation=tf.nn.softplus, scope='sigma'), name="enc_sigma"))
-                debug_sigma = fc_layer(enc_hidden, 5, activation=tf.nn.softplus, scope='sigma')
+                debug_sigma = fc_layer(enc_hidden, 5, activation=tf.nn.relu, scope='sigma')
 	        debug_sigma = tf.Print(debug_sigma,[debug_sigma], message="my debug_sigma-values:")
                 enc_sigma = tf.matrix_diag(debug_sigma, name="enc_sigma")
                 enc_sigma = tf.Print(enc_sigma,[enc_sigma], message="my enc_sigma-values:")
