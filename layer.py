@@ -43,8 +43,8 @@ def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False
 
 #'''
 def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
-    w_in = tf.get_variable(name="w_in", shape=[k, d, 5], initializer=tf.contrib.layers.xavier_initializer())
-    #w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.5))
+    #w_in = tf.get_variable(name="w_in", shape=[k, d, 5], initializer=tf.contrib.layers.xavier_initializer())
+    w_in = tf.get_variable(name="w_in", shape=[k,d,5], initializer=tf.constant_initializer(0.5))
 
     #w_in = tf.get_variable(name="w_in", shape=[k,d, d], initializer=tf.zeros_initializer)
     w_in = tf.Print(w_in,[w_in], message="my w_in-values:")

@@ -90,6 +90,36 @@ def pickle_load(path):
     with open(path, 'rb') as f:
         loaded_pickle = pickle.load(f)
     return loaded_pickle
+def load_data_deg(filename):
+    path = filename+"*"
+    adjlist = []
+    featurelist = []
+    for fname in glob.glob(path):
+        f = open(fname, 'r')
+        G=nx.read_edgelist(f, nodetype=int)
+        f.close()
+        n = G.number_of_nodes() 
+        #degreemat = np.zeros((n,n), dtype=np.int)
+        degreemat = np.zeros((n,1), dtype=np.float)
+
+        edges = G.edges()
+        GC=nx.complete_graph(n)
+        non_edges = list(set(GC.edges()) - set(edges))
+        for u in G.nodes():
+            #degreemat[int(u)][0] = int(G.degree(u)) * 2.0 / n
+            degreemat[int(u)][0] = (G.degree(u)*2.0)/(n *(n-1))
+        indices = np.argsort(degreemat[:,0])
+        perm = np.zeros([n,n])
+        i = 0
+        for el in indices:
+            perm[i][el] = 1
+            i += 1
+        adj = np.array(nx.adjacency_matrix(G).todense())
+        adj = np.matmul(np.matmul(perm, adj),np.transpose(perm))
+        adjlist.append(adj)
+        featurelist.append(degreemat)
+    return (adjlist, featurelist)
+
 def load_data(filename):
     path = filename+"*"
     adjlist = []

@@ -18,11 +18,14 @@ def random_walk(G, seed, k):
 	return walk
 		
 def create_graph(n,m,p):
-	#G = nx.erdos_renyi_graph(n, p)
+	#G = nx.circular_ladder_graph(n)
+        G = nx.erdos_renyi_graph(n, p)
 	#G = nx.barabasi_albert_graph(n, m)
-        G = nx.powerlaw_cluster_graph(n,m,p)
+        #G = nx.powerlaw_cluster_graph(n,m,p)
         #nx.draw_networkx(G, with_labels= True)
-	#print G.nodes()
+	print G.nodes()
+        degree_sequence=list(nx.degree(G).values())
+        print degree_sequence
 	#print G.neighbors(0)
 	#plt.axis('off')
 	#plt.show()
@@ -39,7 +42,6 @@ def get_params():
                         help='probability')
 	parser.add_argument('--k', type=int, default=5,
                         help='length of the random walk')
-
         parser.add_argument('--N', type=int, default=5,
                             help='Number graph with the same parameter you want to learn')
         parser.add_argument('--file', type=str, default='graph/',

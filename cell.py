@@ -30,7 +30,7 @@ class VAEGCell(object):
         return self.n_h
 
 
-    def __call__(self,c_x,n,d,k, scope=None):
+    def __call__(self,c_x,n,d,k,eps_passed, scope=None):
         '''
 		Args:
 			c_x - tensor to be filled up with random walk property
@@ -64,13 +64,16 @@ class VAEGCell(object):
                 enc_sigma = tf.Print(enc_sigma,[enc_sigma], message="my enc_sigma-values:")
 
             # Random sampling ~ N(0, 1)
-            eps = tf.random_normal((n, 5, 1), 0.0, 1.0, dtype=tf.float32)
+            eps = eps_passed 
+            #tf.random_normal((n, 5, 1), 0.0, 1.0, dtype=tf.float32)
 	    
 	    temp_stack = []
 	    for i in range(n):
 		temp_stack.append(tf.matmul(enc_sigma[i], eps[i]))
 	    z = tf.add(enc_mu, tf.stack(temp_stack))
-	    
+	    z = eps
+            #tf.random_normal((n, 5, 1), 0.0, 1.0, dtype=tf.float32)
+ 
 	    with tf.variable_scope("Decoder"):
                 z_stack = []
                 for u in range(n):
@@ -80,5 +83,5 @@ class VAEGCell(object):
 		dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
         return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma)
 
-    def call(self,inputs,n,d,k):
-            return self.__call__(inputs,n,d,k)
+    def call(self,inputs,n,d,k, eps_passed):
+            return self.__call__(inputs,n,d,k, eps_passed)

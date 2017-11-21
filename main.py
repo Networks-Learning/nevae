@@ -65,15 +65,23 @@ if __name__ == '__main__':
     adj, features = load_data(hparams.graph_file)
     num_nodes = adj[0].shape[0]
     num_features = features[0].shape[1]
-    print hparams.generation_file
-    print features
+    #print hparams.generation_file
+    #print features
 
     #print num_nodes, num_features
-    model = VAEG(hparams, placeholders, num_nodes, num_features)
-    model.initialize()
-    model.train(placeholders, hparams, adj, features)
+    #model = VAEG(hparams, placeholders, num_nodes, num_features)
+    #model.initialize()
+    #model.train(placeholders, hparams, adj, features)
     
     #Test code
-    #model2 = VAEG(hparams, placeholders, 20, 1)
-    #model2.restore(hparams.out_dir)
-    #model2.samplegraph(hparams, placeholders,103)
+    model2 = VAEG(hparams, placeholders, 10, 1)
+    model2.restore(hparams.out_dir)
+    i = 0
+    count = 0
+    #while i < 100:
+    ret = model2.samplegraph(hparams, placeholders,36)
+        
+    #if ret:
+    #        count+=1 
+    #    i += 1
+    #print count
