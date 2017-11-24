@@ -51,7 +51,6 @@ def create_hparams(flags):
       z_file=flags.z_file,
       sample_file=flags.sample_file,
 
-
       # training
       learning_rate=flags.learning_rate,
       decay_rate=flags.decay_rate,

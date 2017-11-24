@@ -276,19 +276,9 @@ class VAEG(VAEGConfig):
                         f.write(str(u)+' '+str(v)+' {}'+'\n')
 
         ll1 = np.mean(ll)
-        feed_dict.update({self.adj: adj1})
-	feed_dict.update({self.features: deg1})
-        prob, ll = self.sess.run([self.prob, self.ll],feed_dict=feed_dict )
-        ll2 = np.mean(ll)
-
-        with open(hparams.generation_file+'/ll.txt', 'a') as f:
-            if ll1 > ll2:
-                f.write(str(ll1)+'\t >'+str(ll2)+'\n')
-                return True
-            else:
-                f.write(str(ll1)+'\t <'+str(ll2)+'\n')
-                return False
-            #print ll
+    
+        with open(hparams.sample_file+'/ll.txt', 'a') as f:
+            f.write(str(ll1)+'\n')
         '''
         for u in range(self.n):
             for v in range(u+1,self.n):
