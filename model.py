@@ -104,8 +104,9 @@ class VAEG(VAEGConfig):
         self.eps = tf.placeholder(dtype=tf.float32, shape=[self.n, 5, 1], name='eps')
 
 	self.cell = VAEGCell(self.adj, self.features)
-        self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps)
+        self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps)
 	self.prob = dec_out
+        self.z_encoded = z_encoded
         self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out)
 
         print_vars("trainable_variables")
@@ -152,14 +153,13 @@ class VAEG(VAEGConfig):
             saver.restore(self.sess, ckpt.model_checkpoint_path)
             print("Load the model from %s" % ckpt.model_checkpoint_path)
 
-        iteration = 2000
+        iteration = 1
         #1000
         for epoch in range(num_epochs):
             for i in range(len(adj)):
 
                 # Learning rate decay
                 #self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
-                
                 feed_dict = construct_feed_dict(lr, dr, self.k, self.n, self.d, decay, placeholders)
                 feed_dict.update({self.adj: adj[i]})
 	        print "Debug", features[i].shape
@@ -172,7 +172,7 @@ class VAEG(VAEGConfig):
                 for j in xrange(len(self.grad_placeholder)):
                     feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
 
-                input_, train_loss, _, probdict,cx= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob, self.c_x], feed_dict=feed_dict)
+                input_, train_loss, _, probdict,cx, z_encoded= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob, self.c_x, self.z], feed_dict=feed_dict)
 
                 iteration += 1
                 #print "Debug Grad", grad_vals[0]
@@ -184,8 +184,36 @@ class VAEG(VAEGConfig):
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))
 
+    def plot_hspace(self, haparms):
+        #plot the coordinate in hspace
+        
+        if hparams.plot_train:
+            adj, deg = load_data(hparams.graph_file)
+            for i in range(adj):
+                feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
+                feed_dict.update({self.adj: adj[i]})
+	        feed_dict.update({self.features: deg[i]})
+                feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
+                feed_dict.update({self.eps: eps})
+                prob, ll, z = self.sess.run([self.prob, self.ll, self.z],feed_dict=feed_dict )
+                with open(hparams.z_dir+'train_'+str(i)+'.txt') as f:
+                    for z_i in z:
+                        f.write('['+','.join([str(el) for el in z_i]+']'))
+        if hparams.plot_sample:
+            adj, deg = load_data(hparams.sample_file)
+            for i in range(adj):
+                feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
+                feed_dict.update({self.adj: adj[i]})
+	        feed_dict.update({self.features: deg[i]})
+                feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
+                feed_dict.update({self.eps: eps})
+                prob, ll, z = self.sess.run([self.prob, self.ll, self.z],feed_dict=feed_dict )
+                with open(hparams.z_dir+'test_'+str(i)+'.txt') as f:
+                    for z_i in z:
+                        f.write('['+','.join([str(el) for el in z_i]+']'))
+ 
 
-    def samplegraph(self, hparams, placeholders, num=103, outdir=None):
+    def samplegraph(self, hparams, placeholders, s_num, num=10, outdir=None):
         '''
         Args :
             num - int
@@ -197,37 +225,24 @@ class VAEG(VAEGConfig):
         '''
         list_edges = []
         for i in range(self.n):
-            for j in range(self.n):
+            for j in range(i+1, self.n):
+            #for j in range(self.n):
                     list_edges.append((i,j))
-        adj = proxy('test/1.edgelist')
-        adj1 = proxy('graph_multiple1/4.edgelist')
-        #adj = proxy('powerlaw/0.edgelist', perm=True)
-        #adj = proxy('powerlaw/0.edgelist', perm=True)
-        #adj = proxy('powerlaw/0.edgelist')
-        #adj = proxy('plotpowerlaw/candidate.txt')
-        #adj = proxy('plotpowerlaw/candidate_perm.txt')
-        #adj = proxy('plotpowerlaw/candidate_r1.txt')
-        #adj = proxy('plotpowerlaw/candidate_r2.txt')
-        #adj = proxy('plotpowerlaw/candidate_perm2.txt')
-        #print np.sum(adj)
         
-        #print "Debug adj", adj.shape, adj
         #candidate_edges =[ list_edges[i] for i in random.sample(range(len(list_edges)), num)]
-        #adj = np.zeros([self.n, self.n])
-        #print "Len()", len(candidate_edges)
+        
         deg = np.zeros([self.n, 1], dtype=np.float)
-        deg1 = np.zeros([self.n, 1], dtype=np.float)
-
-        #for (u,v) in candidate_edges:
-        #    adj[u][v] = 1
-        #    adj[v][u] = 1
 
         for i in range(self.n):
             #print np.sum(adj[i]) 
             deg[i][0] = 2 * np.sum(adj[i])/(self.n*(self.n - 1))
-            deg1[i][0] = 2 * np.sum(adj1[i])/(self.n*(self.n - 1))
+            #deg1[i][0] = 2 * np.sum(adj1[i])/(self.n*(self.n - 1))
 
         eps = np.random.randn(self.n, 5, 1) 
+        with open(hparams.plot_dir+'test_prior_'+s_num+'.txt') as f:
+                    for z_i in z:
+                        f.write('['+','.join([str(el) for el in z_i]+']'))
+
         #tf.random_normal((self.n, 5, 1), 0.0, 1.0, dtype=tf.float32)
         feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
         feed_dict.update({self.adj: adj})
@@ -236,27 +251,36 @@ class VAEG(VAEGConfig):
         feed_dict.update({self.eps: eps})
         prob, ll = self.sess.run([self.prob, self.ll],feed_dict=feed_dict )
         #print prob
-        prob = np.divide(prob, np.sum(prob))
-        print prob
         
-        candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[16], p=prob[:,0])]
+        #prob = np.divide(prob, np.sum(prob))
+        #print prob
+        prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
+        prob = np.divide(prob, np.sum(prob))
+        problist  = []
+        for i in range(self.n):
+            for j in range(i+1, self.n):
+                problist.append(prob[i][j])
+        
+        #for i in range(self.n):
+        #    for j in range(i+1, self.n):
+        #        prob[j][i] = prob[i][j]
+        candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[16], p=problist)]
+
+        #candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[16], p=prob[:,0])]
         #score = self.neg_loglikelihood(tf.convert_to_tensor(prob).todense(), adj, self.n) 
         #with open('outputgraph/test1', 'a') as f:
         #    f.write(str(ll)+'\n')
         #for (u,v) in candidate_edges:
         for (u,v) in candidate_edges:
-            with open('outputgraph/sample3.txt', 'a') as f:
+            with open(hparams.sample_file+str(s_num), 'a') as f:
                         f.write(str(u)+' '+str(v)+' {}'+'\n')
 
         ll1 = np.mean(ll)
-        print ll
         feed_dict.update({self.adj: adj1})
 	feed_dict.update({self.features: deg1})
         prob, ll = self.sess.run([self.prob, self.ll],feed_dict=feed_dict )
         ll2 = np.mean(ll)
 
-        #print ll
-        #score = self.neg_loglikelihood(tf.convert_to_tensor(prob).todense(), adj, self.n) 
         with open(hparams.generation_file+'/ll.txt', 'a') as f:
             if ll1 > ll2:
                 f.write(str(ll1)+'\t >'+str(ll2)+'\n')
@@ -265,9 +289,6 @@ class VAEG(VAEGConfig):
                 f.write(str(ll1)+'\t <'+str(ll2)+'\n')
                 return False
             #print ll
-        #print "Debug n", self.n
-        #for (u,v) in candidate_edges:
-        #print adj
         '''
         for u in range(self.n):
             for v in range(u+1,self.n):

@@ -71,17 +71,19 @@ class VAEGCell(object):
 	    for i in range(n):
 		temp_stack.append(tf.matmul(enc_sigma[i], eps[i]))
 	    z = tf.add(enc_mu, tf.stack(temp_stack))
-	    z = eps
+            #While we are trying to sample some edges, we sample Z from prior
+            if hparams.sample:
+                z = eps
             #tf.random_normal((n, 5, 1), 0.0, 1.0, dtype=tf.float32)
  
 	    with tf.variable_scope("Decoder"):
                 z_stack = []
                 for u in range(n):
                     for v in range(n):
+                    #for v in range(u+1, n):
                         z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis = 1)[0])
-	        
 		dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
-        return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma)
+        return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma, z)
 
     def call(self,inputs,n,d,k, eps_passed):
             return self.__call__(inputs,n,d,k, eps_passed)
