@@ -185,9 +185,9 @@ class VAEG(VAEGConfig):
                     logger.info("model saved to {}".format(checkpoint_path))
 
     def plot_hspace(self, haparms):
-        #plot the coordinate in hspace
+            #plot the coordinate in hspace
         
-        if hparams.plot_train:
+            #if hparams.plot_train:
             adj, deg = load_data(hparams.graph_file)
             for i in range(adj):
                 feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
@@ -199,7 +199,7 @@ class VAEG(VAEGConfig):
                 with open(hparams.z_dir+'train_'+str(i)+'.txt') as f:
                     for z_i in z:
                         f.write('['+','.join([str(el) for el in z_i]+']'))
-        if hparams.plot_sample:
+            #if hparams.plot_sample:
             adj, deg = load_data(hparams.sample_file)
             for i in range(adj):
                 feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
