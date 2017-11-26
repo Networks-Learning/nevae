@@ -171,15 +171,6 @@ class VAEG(VAEGConfig):
                 grad_vals = self.sess.run([g[0] for g in self.grad], feed_dict=feed_dict)
                 for j in xrange(len(self.grad_placeholder)):
                     feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
-<<<<<<< HEAD
-                # compute gradients
-                #grad_vals = self.sess.run([g for (g,v) in self.grad], feed_dict=feed_dict)
-                print 'grad_vals: ',grad_vals[0:5]
-                # applies the gradients
-                #result = sess.run(apply_transform_op, feed_dict={b: b_val})
-=======
->>>>>>> 9082d2f... Cleaning up the code
-
                 input_, train_loss, _, probdict, cx= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob, self.c_x], feed_dict=feed_dict)
 
                 iteration += 1
