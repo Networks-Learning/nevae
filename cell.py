@@ -4,8 +4,6 @@ import numpy as np
 from utils import *
 from math import exp
 
-
-#class VAEGCell(tf.nn.rnn_cell.RNNCell):
 class VAEGCell(object):
     """Variational Auto Encoder cell."""
 
@@ -30,7 +28,7 @@ class VAEGCell(object):
         return self.n_h
 
 
-    def __call__(self,c_x,n,d,k,eps_passed, scope=None):
+    def __call__(self,c_x,n,d,k,eps_passed, sample,scope=None):
         '''
 		Args:
 			c_x - tensor to be filled up with random walk property
@@ -42,8 +40,6 @@ class VAEGCell(object):
         with tf.variable_scope(scope or type(self).__name__):
             c_x = input_layer(c_x, self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False, scope=None)
             c_x = tf.Print(c_x,[c_x], message="my c_x-values:")
-
-            #print "c_x",c_x.shape
 	    with tf.variable_scope("Prior"):
                 prior_mu = tf.zeros(shape=[n,5,1],name="prior_mu") 
                 prior_sigma = tf.matrix_diag(tf.ones(shape=[n,5]),name="prior_sigma")
@@ -72,9 +68,8 @@ class VAEGCell(object):
 		temp_stack.append(tf.matmul(enc_sigma[i], eps[i]))
 	    z = tf.add(enc_mu, tf.stack(temp_stack))
             #While we are trying to sample some edges, we sample Z from prior
-            if hparams.sample:
+            if sample:
                 z = eps
-            #tf.random_normal((n, 5, 1), 0.0, 1.0, dtype=tf.float32)
  
 	    with tf.variable_scope("Decoder"):
                 z_stack = []
@@ -85,5 +80,5 @@ class VAEGCell(object):
 		dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
         return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma, z)
 
-    def call(self,inputs,n,d,k, eps_passed):
-            return self.__call__(inputs,n,d,k, eps_passed)
+    def call(self,inputs,n,d,k,eps_passed, sample):
+            return self.__call__(inputs,n,d,k, eps_passed, sample)

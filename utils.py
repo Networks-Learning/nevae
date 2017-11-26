@@ -90,81 +90,49 @@ def pickle_load(path):
     with open(path, 'rb') as f:
         loaded_pickle = pickle.load(f)
     return loaded_pickle
-def load_data_deg(filename):
+
+def load_data(filename, num):
     path = filename+"*"
     adjlist = []
     featurelist = []
-    for fname in glob.glob(path):
+    for fname in sorted(glob.glob(path)):
+        print "fname", fname
         f = open(fname, 'r')
-        G=nx.read_edgelist(f, nodetype=int)
+        try:
+            G=nx.read_edgelist(f, nodetype=int)
+        except:
+            continue
         f.close()
-        n = G.number_of_nodes() 
+        n = num
+        for i in range(n):
+            if i not in G.nodes():
+                G.add_node(i)
         #degreemat = np.zeros((n,n), dtype=np.int)
         degreemat = np.zeros((n,1), dtype=np.float)
 
         edges = G.edges()
-        GC=nx.complete_graph(n)
-        non_edges = list(set(GC.edges()) - set(edges))
-        for u in G.nodes():
-            #degreemat[int(u)][0] = int(G.degree(u)) * 2.0 / n
-            degreemat[int(u)][0] = (G.degree(u)*2.0)/(n *(n-1))
-        indices = np.argsort(degreemat[:,0])
-        perm = np.zeros([n,n])
-        i = 0
-        for el in indices:
-            perm[i][el] = 1
-            i += 1
-        adj = np.array(nx.adjacency_matrix(G).todense())
-        adj = np.matmul(np.matmul(perm, adj),np.transpose(perm))
-        adjlist.append(adj)
-        featurelist.append(degreemat)
-    return (adjlist, featurelist)
-
-def load_data(filename):
-    path = filename+"*"
-    adjlist = []
-    featurelist = []
-    for fname in glob.glob(path):
-        f = open(fname, 'r')
-        G=nx.read_edgelist(f, nodetype=int)
-        f.close()
-        n = G.number_of_nodes() 
-        #degreemat = np.zeros((n,n), dtype=np.int)
-        degreemat = np.zeros((n,1), dtype=np.float)
-
-        edges = G.edges()
-        GC=nx.complete_graph(n)
-        non_edges = list(set(GC.edges()) - set(edges))
         for u in G.nodes():
             #degreemat[int(u)][0] = int(G.degree(u)) * 2.0 / n
             degreemat[int(u)][0] = (G.degree(u)*2.0)/(n *(n-1))
 
-        adjlist.append(np.array(nx.adjacency_matrix(G).todense()))
-        featurelist.append(degreemat)
+        try:
+            adjlist.append(np.array(nx.adjacency_matrix(G).todense()))
+            featurelist.append(degreemat)
+        except:
+            continue
     return (adjlist, featurelist)
     #return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
 
 def proxy(filename, perm = False):
-    #for fname in glob.glob(path):
         print "filename", filename
         f = open(filename, 'r')
         G=nx.read_edgelist(f, nodetype=int)
         n = G.number_of_nodes()
         edges = G.edges()
-        #print "edges", nx.adjacency_matrix(G)
         if perm == True:
             p = np.identity(n, dtype=np.int)
             np.random.shuffle(p)
-        
-            #print perm
             adj = np.array(nx.adjacency_matrix(G).todense())
-            #temp = adj[10]
-            #adj[10] = adj[15]
-            #adj[15] = temp
-
-            #temp = adj[:,10]
-            #adj[:,10] = adj[:,15]
-            #adj[:,15] = temp
             adj = np.matmul(np.matmul(p,adj),p.transpose())
             return adj
         return np.array(nx.adjacency_matrix(G).todense())
