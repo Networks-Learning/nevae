@@ -3,6 +3,7 @@ from config import SAVE_DIR, VAEGConfig
 from datetime import datetime
 #from ops import print_vars
 from cell import VAEGCell
+from dynamiccell import VAEGDCell
 
 import tensorflow as tf
 import numpy as np
@@ -60,7 +61,7 @@ class VAEG(VAEGConfig):
             '''
                 Kullback leibler divergence for two gaussian distributions
             '''
-            print sigma_1.shape, sigma_2.shape
+            #print sigma_1.shape, sigma_2.shape
             with tf.variable_scope("kl_gaussisan"):
                 temp_stack = []
                 for i in range(self.n):
@@ -102,8 +103,18 @@ class VAEG(VAEGConfig):
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
         self.eps = tf.placeholder(dtype=tf.float32, shape=[self.n, 5, 1], name='eps')
 
-        self.cell = VAEGCell(self.adj, self.features)
-        self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps, hparams.sample)
+        # Based on the static or dynamic case this is done
+        if hparams.static:
+            self.cell = VAEGCell(self.adj, self.features)
+        else:
+            self.cell = VAEGDCell(self.adj, self.features, self.h_dim, self.x_dim, self.z_dim)
+
+        self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
+        if hparams.static:
+            self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps, hparams.sample)
+        else:
+            (self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded), last_state = tf.contrib.rnn.static_rnn(self.cell, self.input_data, self.n, self.d, self.k, self.eps, hparams.sample, initial_state=(self.initial_state_c, self.initial_state_h))
+
         self.prob = dec_out
         self.z_encoded = z_encoded
         self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out)
@@ -157,11 +168,12 @@ class VAEG(VAEGConfig):
             print("Load the model from %s" % ckpt.model_checkpoint_path)
 
         iteration = 1
-        #1000
         for epoch in range(num_epochs):
             for batch in range(self.n_batches):
             #for i in range(len(adj)):
+                #specific to dynamic one
                 adj, basis, features = self.next_batch()
+
                 # Learning rate decay
                 self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
 
@@ -176,18 +188,14 @@ class VAEG(VAEGConfig):
                 feed_dict.update({self.features: features})
                 feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
                 feed_dict.update({self.basis: basis})
-
                 grad_vals = self.sess.run([g[0] for g in self.grad], feed_dict=feed_dict)
                 for j in xrange(len(self.grad_placeholder)):
                     feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
                 input_, train_loss, _, probdict, cx= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob, self.c_x], feed_dict=feed_dict)
 
                 iteration += 1
-                #print "Debug Grad", grad_vals[0]
-                #print "Debug CX", cx
                 if iteration % hparams.log_every == 0 and iteration > 0:
-                    print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
-		            #print(probdict)
+                    print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, self.num_epochs * self.n_batches, epoch+1, train_loss))
                     checkpoint_path = os.path.join(savedir, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))
@@ -197,14 +205,13 @@ class VAEG(VAEGConfig):
 
     def plot_hspace(self, hparams, placeholders, num):
             #plot the coordinate in hspace
-            
             adj, deg = load_data(hparams.graph_file, num)
             hparams.sample= False
             for i in range(len(adj)):
                 eps = np.random.randn(self.n, 5, 1) 
                 feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
                 feed_dict.update({self.adj: adj[i]})
-	        feed_dict.update({self.features: deg[i]})
+                feed_dict.update({self.features: deg[i]})
                 feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
                 feed_dict.update({self.eps: eps})
                 prob, ll, z = self.sess.run([self.prob, self.ll, self.z_encoded],feed_dict=feed_dict )
@@ -218,7 +225,7 @@ class VAEG(VAEGConfig):
                 eps = np.random.randn(self.n, 5, 1) 
                 feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
                 feed_dict.update({self.adj: adj[i]})
-	        feed_dict.update({self.features: deg[i]})
+                feed_dict.update({self.features: deg[i]})
                 feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
                 feed_dict.update({self.eps: eps})
                 prob, ll, z = self.sess.run([self.prob, self.ll, self.z_encoded],feed_dict=feed_dict )
@@ -260,7 +267,7 @@ class VAEG(VAEGConfig):
         #tf.random_normal((self.n, 5, 1), 0.0, 1.0, dtype=tf.float32)
         feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
         feed_dict.update({self.adj: adj})
-	    feed_dict.update({self.features: deg})
+        feed_dict.update({self.features: deg})
         feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
         feed_dict.update({self.eps: eps})
         prob, ll = self.sess.run([self.prob, self.ll],feed_dict=feed_dict )

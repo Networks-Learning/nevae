@@ -123,6 +123,14 @@ def load_data(filename, num):
     return (adjlist, featurelist)
     #return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
 
+def calculate_feature(adj):
+    n = len(adj[0])
+    degreemat = np.zeros((n, 1), dtype=np.float)
+    for u in range(n):
+        # degreemat[int(u)][0] = int(G.degree(u)) * 2.0 / n
+        degreemat[int(u)][0] = (np.sum(adj[i]) * 2.0) / (n * (n - 1))
+    return degreemat
+
 def proxy(filename, perm = False):
         print "filename", filename
         f = open(filename, 'r')
