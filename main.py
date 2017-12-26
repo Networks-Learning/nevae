@@ -1,4 +1,5 @@
-from utils import create_dir, pickle_save, print_vars, load_data, get_shape, proxy
+
+from utils import create_dir, pickle_save, print_vars, load_data, get_shape
 from config import SAVE_DIR, VAEGConfig
 from datetime import datetime
 from cell import VAEGCell
@@ -34,7 +35,7 @@ def add_arguments(parser):
 
     parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
     parser.add_argument("--graph_file", type=str, default=None,
-                        help="The dictory where the training graph structure is saved")
+                        help="The directory where the training graph structure is saved")
     parser.add_argument("--z_dir", type=str, default=None,
                         help="The z values will be stored file to be stored")
     parser.add_argument("--sample", type=bool, default=False, help="True if you want to sample")

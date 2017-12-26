@@ -11,7 +11,8 @@ class VAEGCell(object):
         '''
         Args:
         adj : adjacency matrix
-	features: feature matrix
+
+        features: feature matrix
 	'''
         self.adj = adj
         self.features = features

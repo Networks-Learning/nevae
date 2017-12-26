@@ -50,7 +50,7 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
 			k - length of random walk
 				defaults to be None
     	'''
-        c , h = state
+        c, h = state
         with tf.variable_scope(scope or type(self).__name__):
             c_x = input_layer(c_x, self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False,
                               scope=None)

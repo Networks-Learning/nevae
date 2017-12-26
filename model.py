@@ -142,7 +142,7 @@ class VAEG(VAEGConfig):
         if self.current >= len(self.edges):
             return False
         adj = np.zeros([self.n, self.n])
-        for (u,v) in self.edges[: self.current + self.batch_size]:
+        for (u,v) in self.edges[self.current: self.current + self.batch_size]:
         #for (u,v) in edge_list:
             adj[u][v] = 1
             adj[v][u] = 1
