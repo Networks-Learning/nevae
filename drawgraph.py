@@ -8,14 +8,18 @@ from networkx.drawing.layout import *
 from random import choice
 from collections import defaultdict
 		
-def draw_graph(G, title,pos):
+def draw_graph(G, pos):
+	
+	pos = graphviz_layout(G)
+
+
 	#nx.draw_networkx(G, pos=nx.spring_layout(G),with_labels= True)
-	nx.draw_networkx(G, pos=circular_layout(G),with_labels= True)
+	#nx.draw_networkx(G, pos=circular_layout(G),with_labels= True)
         #nx.draw_networkx(G, pos=shell_layout(G), with_labels=True)
         #nx.draw_networkx(G, pos=spectral_layout(G), with_labels=True)
         #nx.draw_networkx(G, pos=fruchterman_reingold_layout(G), with_labels=True)
         #f = plt.figure()
-        #nx.draw(G, pos=pos, with_labels=True,ax=f.add_subplot(111))
+        nx.draw(G, pos=pos, with_labels=True,ax=f.add_subplot(111))
 
         #rescale_layout
         #print G.nodes()
@@ -33,8 +37,6 @@ if __name__ == "__main__":
         #path = [sys.argv[1]+"1.txt",sys.argv[1]+"2.txt",sys.argv[1]+"3.txt",sys.argv[1]+"4.txt" ]
         path = sys.argv[1]
         #with open(sys.argv[1]+"ll.txt") as f:
-        with open(sys.argv[2]) as f:
-            lines = f.readlines()
         count = 0
         #for fname in glob.glob(path):
         for fname in [path]:
@@ -55,7 +57,7 @@ if __name__ == "__main__":
                     col+=1
                     row = 0
                 #row+=1
-            draw_graph(G, lines[count], pos)
+            draw_graph(G,pos)
             f.close()
             count +=1
             #break

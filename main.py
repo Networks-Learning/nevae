@@ -34,12 +34,18 @@ def add_arguments(parser):
     parser.add_argument("--sample_file", type=str, default=None, help="directory to store the sample graphs")
 
     parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
+    parser.add_argument("--h_dim", type=int, default=5, help="hidden state RNN dimension")
+    parser.add_argument("--z_dim", type=int, default=5, help="latent space dimension")
+    parser.add_argument("--x_dim", type=int, default=5, help="input batches")
+
+    parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
+
     parser.add_argument("--graph_file", type=str, default=None,
                         help="The directory where the training graph structure is saved")
+
     parser.add_argument("--z_dir", type=str, default=None,
                         help="The z values will be stored file to be stored")
     parser.add_argument("--sample", type=bool, default=False, help="True if you want to sample")
-
     parser.add_argument("--out_dir", type=str, default=None,
                         help="Store log/model files.")
 
@@ -70,11 +76,11 @@ if __name__ == '__main__':
     FLAGS, unparsed = nmt_parser.parse_known_args()
     hparams = create_hparams(FLAGS)
     # loading the data from a file
-    adj, features = load_data(hparams.graph_file, 10)
+    adj, features, edges = load_data(hparams.graph_file)
     num_nodes = adj[0].shape[0]
     num_features = features[0].shape[1]
     # Training
-    model = VAEG(hparams, placeholders, num_nodes, num_features)
+    model = VAEG(hparams, placeholders, num_nodes, num_features, edges)
     model.initialize()
     model.train(placeholders, hparams, adj, features)
     

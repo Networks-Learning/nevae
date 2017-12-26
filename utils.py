@@ -91,26 +91,29 @@ def pickle_load(path):
         loaded_pickle = pickle.load(f)
     return loaded_pickle
 
-def load_data(filename, num):
+def load_data(filename):
     path = filename+"*"
     adjlist = []
     featurelist = []
+    edgelist = []
     for fname in sorted(glob.glob(path)):
-        print "fname", fname
+        #print "fname", fname
         f = open(fname, 'r')
         try:
             G=nx.read_edgelist(f, nodetype=int)
         except:
             continue
         f.close()
+        '''
         n = num
         for i in range(n):
             if i not in G.nodes():
                 G.add_node(i)
+        '''
         #degreemat = np.zeros((n,n), dtype=np.int)
         degreemat = np.zeros((n,1), dtype=np.float)
 
-        edges = G.edges()
+        #edges = G.edges()
         for u in G.nodes():
             #degreemat[int(u)][0] = int(G.degree(u)) * 2.0 / n
             degreemat[int(u)][0] = (G.degree(u)*2.0)/(n *(n-1))
@@ -118,9 +121,11 @@ def load_data(filename, num):
         try:
             adjlist.append(np.array(nx.adjacency_matrix(G).todense()))
             featurelist.append(degreemat)
+            edgelist.append(G.edges())
         except:
             continue
-    return (adjlist, featurelist)
+
+    return (adjlist, featurelist, edgelist)
     #return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
 
 def calculate_feature(adj):
@@ -128,7 +133,7 @@ def calculate_feature(adj):
     degreemat = np.zeros((n, 1), dtype=np.float)
     for u in range(n):
         # degreemat[int(u)][0] = int(G.degree(u)) * 2.0 / n
-        degreemat[int(u)][0] = (np.sum(adj[i]) * 2.0) / (n * (n - 1))
+        degreemat[int(u)][0] = np.sum(adj[u]) / n
     return degreemat
 
 def proxy(filename, perm = False):
