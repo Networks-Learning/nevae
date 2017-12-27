@@ -29,7 +29,7 @@ class VAEG(VAEGConfig):
         self.d = num_features
         self.edges = edges
         self.z_dim = hparams.z_dim
-        self.x_
+        self.x_dim = hparams.z_dim
         self.h_dim = hparams.h_dim
         self.n_batches = hparams.n_batches
         #self.edges, self.non_edges = edges, non_edges
@@ -109,6 +109,7 @@ class VAEG(VAEGConfig):
             self.cell = VAEGCell(self.adj, self.features)
         else:
             print("Debug Dynamic")
+            self.batch_size = 1
             self.cell = VAEGDCell(self.adj, self.features, self.h_dim, self.x_dim, self.z_dim)
             self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
         
