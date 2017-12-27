@@ -111,6 +111,7 @@ def load_data(filename):
                 G.add_node(i)
         '''
         #degreemat = np.zeros((n,n), dtype=np.int)
+        n = len(G.nodes())
         degreemat = np.zeros((n,1), dtype=np.float)
 
         #edges = G.edges()

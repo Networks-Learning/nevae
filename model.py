@@ -107,12 +107,14 @@ class VAEG(VAEGConfig):
         if hparams.static:
             self.cell = VAEGCell(self.adj, self.features)
         else:
+            print("Debug Dynamic")
             self.cell = VAEGDCell(self.adj, self.features, self.h_dim, self.x_dim, self.z_dim)
-
-        self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
+            self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
+        
         if hparams.static:
             self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps, hparams.sample)
         else:
+            print("Debug Dynamic")
             (self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded), last_state = tf.contrib.rnn.static_rnn(self.cell, self.input_data, self.n, self.d, self.k, self.eps, hparams.sample, initial_state=(self.initial_state_c, self.initial_state_h))
 
         self.prob = dec_out
