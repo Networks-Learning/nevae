@@ -111,13 +111,15 @@ class VAEG(VAEGConfig):
 
         self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
         if hparams.static:
-            self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps, hparams.sample)
+            self.c_x, enc_mu, enc_sigma, debug_sigma, dec_out, prior_mu, prior_sigma, z_encoded = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps, hparams.sample)
+            self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma, prior_mu, prior_sigma, dec_out)
         else:
-            (self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded), last_state = tf.contrib.rnn.static_rnn(self.cell, self.input_data, self.n, self.d, self.k, self.eps, hparams.sample, initial_state=(self.initial_state_c, self.initial_state_h))
-
+            #c_x, enc_mu, enc_sigma, enc_intermediate_sigma, dec_hidden, prior_mu, prior_sigma, prior_intermediate_sigma, z
+            (self.c_x, enc_mu, enc_sigma, debug_sigma1, dec_out, prior_mu, prior_sigma, debug_sigma2, z_encoded), last_state = tf.contrib.rnn.static_rnn(self.cell, self.input_data, self.n, self.d, self.k, self.eps, hparams.sample, initial_state=(self.initial_state_c, self.initial_state_h))
+            self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma1, prior_mu, prior_sigma, debug_sigma2, dec_out)
         self.prob = dec_out
         self.z_encoded = z_encoded
-        self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out)
+        #self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma1,prior_mu, prior_sigma, debug_sigma2, dec_out)
 
         print_vars("trainable_variables")
         # self.lr = tf.Variable(self.lr, trainable=False)

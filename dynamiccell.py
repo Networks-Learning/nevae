@@ -58,7 +58,8 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
         with tf.variable_scope("Prior"):
             prior_hidden = fc_layer(h, self.n_prior_hidden, activation=tf.nn.relu, scope="hidden")
             prior_mu = fc_layer(prior_hidden, self.n_z, scope="mu")
-            prior_sigma = fc_layer(prior_hidden, self.n_z, activation=tf.nn.softplus, scope="sigma")  # >=0
+            prior_intermediate_sigma = fc_layer(prior_hidden, self.n_z, activation=tf.nn.softplus, scope="sigma")  # >=0
+            prior_sigma = tf.matrix_diag(prior_intermediate_sigma, name="sigma")
 
         c_x_1 = fc_layer(tf.matmul(c_x[-1],bias_laplace), self.n_x_1, activation = tf.nn.relu, scope = "phi_c")# >=0
 
@@ -71,11 +72,10 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
                 # output will be of shape n X 5 (this is a hyper paramater)
                 enc_mu = fc_layer(enc_hidden, self.n_z, activation=tf.nn.softplus, scope='mu')
                 enc_mu = tf.reshape(enc_mu, [n, self.n_z, 1])
-
                 # output will be n X 1 then convert that to a diagonal matrix
-                intermediate_sigma = fc_layer(enc_hidden, self.n_z, activation=tf.nn.softplus, scope='sigma')
-                intermediate_sigma = tf.Print(intermediate_sigma, [intermediate_sigma], message="my debug_sigma-values:")
-                enc_sigma = tf.matrix_diag(intermediate_sigma, name="enc_sigma")
+                enc_intermediate_sigma = fc_layer(enc_hidden, self.n_z, activation=tf.nn.softplus, scope='sigma')
+                enc_intermediate_sigma = tf.Print(enc_intermediate_sigma, [enc_intermediate_sigma], message="my debug_sigma-values:")
+                enc_sigma = tf.matrix_diag(enc_intermediate_sigma, name="sigma")
 
 
         # Random sampling ~ N(0, 1)
@@ -98,7 +98,7 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
                         z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis=1)[0])
                 dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope="hidden")
 
-        return (c_x, enc_mu, enc_sigma, dec_hidden, prior_mu, prior_sigma, z)
+        return (c_x, enc_mu, enc_sigma, enc_intermediate_sigma, dec_hidden, prior_mu, prior_sigma, prior_intermediate_sigma, z)
 
     def call(self, state, c_x, n, d, k, eps_passed, sample, bias_laplace):
         return self.__call__(state, c_x, n, d, k, eps_passed, sample, bias_laplace)
