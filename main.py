@@ -43,7 +43,7 @@ def add_arguments(parser):
     parser.add_argument("--z_dir", type=str, default=None,
                         help="The z values will be stored file to be stored")
     parser.add_argument("--sample", type=bool, default=False, help="True if you want to sample")
-    parser.add_argument("--static", type=bool, default=True, help="True if you want to learn static graphs")
+    parser.add_argument("--dynamic", type=bool, default=False, help="True if you want to learn dynamic graphs")
 
     parser.add_argument("--out_dir", type=str, default=None,
                         help="Store log/model files.")
@@ -69,7 +69,7 @@ def create_hparams(flags):
       sample=flags.sample,
 
       #static or dynamic
-      static=flags.static,
+      dynamic=flags.dynamic,
 
       #size of network
       z_dim=flags.z_dim,

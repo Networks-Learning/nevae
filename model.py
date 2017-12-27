@@ -28,8 +28,8 @@ class VAEG(VAEGConfig):
         self.n = num_nodes
         self.d = num_features
         self.edges = edges
-        self.n_z = hparams.z_dim
-        self.n_h = hparams.h_dim
+        self.z_dim = hparams.z_dim
+        self.h_dim = hparams.h_dim
         self.n_batches = hparams.n_batches
         #self.edges, self.non_edges = edges, non_edges
 
@@ -104,16 +104,16 @@ class VAEG(VAEGConfig):
         self.eps = tf.placeholder(dtype=tf.float32, shape=[self.n, 5, 1], name='eps')
 
         # Based on the static or dynamic case this is done
-        if hparams.static:
+        if not hparams.dynamic:
             self.cell = VAEGCell(self.adj, self.features)
         else:
             print("Debug Dynamic")
             self.cell = VAEGDCell(self.adj, self.features, self.h_dim, self.x_dim, self.z_dim)
             self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
         
-        if hparams.static:
+        if not hparams.dynamic:
             self.c_x, enc_mu, enc_sigma, debug_sigma, dec_out, prior_mu, prior_sigma, z_encoded = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps, hparams.sample)
-            self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma, prior_mu, prior_sigma, dec_out)
+            self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma, prior_mu, prior_sigma, debug_sigma, dec_out)
         else:
             #c_x, enc_mu, enc_sigma, enc_intermediate_sigma, dec_hidden, prior_mu, prior_sigma, prior_intermediate_sigma, z
             (self.c_x, enc_mu, enc_sigma, debug_sigma1, dec_out, prior_mu, prior_sigma, debug_sigma2, z_encoded), last_state = tf.contrib.rnn.static_rnn(self.cell, self.input_data, self.n, self.d, self.k, self.eps, hparams.sample, initial_state=(self.initial_state_c, self.initial_state_h))
