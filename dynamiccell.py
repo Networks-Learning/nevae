@@ -16,7 +16,7 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
 
         hyperparameters
         h_dim : hidden state dimension
-        x_dim : input chunk size (number of edges to be processed at the same time)
+        x_dim : input dimension
         z_dim : encoded space dimension
         '''
 
@@ -61,7 +61,7 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
             prior_intermediate_sigma = fc_layer(prior_hidden, self.n_z, activation=tf.nn.softplus, scope="sigma")  # >=0
             prior_sigma = tf.matrix_diag(prior_intermediate_sigma, name="sigma")
 
-        c_x_1 = fc_layer(tf.matmul(c_x[-1],bias_laplace), self.n_x_1, activation = tf.nn.relu, scope = "phi_c")# >=0
+        c_x_1 = fc_layer(tf.matmul(bias_laplace, c_x[-1]), self.n_x_1, activation = tf.nn.relu, scope = "phi_c")# >=0
 
         with tf.variable_scope("Encoder"):
                 list_cx = tf.unstack(c_x)
@@ -85,10 +85,13 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
         temp_stack = []
         for i in range(n):
             temp_stack.append(tf.matmul(enc_sigma[i], eps[i]))
-            z = tf.add(enc_mu, tf.stack(temp_stack))
-            # While we are trying to sample some edges, we sample Z from prior
+        z = tf.add(enc_mu, tf.stack(temp_stack))
+        # While we are trying to sample some edges, we sample Z from prior
         if sample:
             z = eps
+
+        with tf.variable_scope("phi_z"):
+            z_1 = fc_layer(tf.matmul(bias_laplace, z), self.n_z_1, activation=tf.nn.relu)
 
         with tf.variable_scope("Decoder"):
                 z_stack = []
@@ -98,7 +101,8 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
                         z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis=1)[0])
                 dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope="hidden")
 
-        return (c_x, enc_mu, enc_sigma, enc_intermediate_sigma, dec_hidden, prior_mu, prior_sigma, prior_intermediate_sigma, z)
+        output, state2 = self.lstm(tf.concat(axis=1, values=(c_x_1, z_1)), state)
+        return (c_x, enc_mu, enc_sigma, enc_intermediate_sigma, dec_hidden, prior_mu, prior_sigma, prior_intermediate_sigma, z), state2
 
     def call(self, state, c_x, n, d, k, eps_passed, sample, bias_laplace):
         return self.__call__(state, c_x, n, d, k, eps_passed, sample, bias_laplace)
