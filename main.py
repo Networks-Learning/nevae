@@ -37,9 +37,6 @@ def add_arguments(parser):
     parser.add_argument("--h_dim", type=int, default=5, help="hidden state RNN dimension")
     parser.add_argument("--z_dim", type=int, default=5, help="latent space dimension")
     parser.add_argument("--x_dim", type=int, default=5, help="input batches")
-
-    parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
-
     parser.add_argument("--graph_file", type=str, default=None,
                         help="The directory where the training graph structure is saved")
 
