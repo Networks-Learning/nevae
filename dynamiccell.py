@@ -8,7 +8,7 @@ from math import exp
 class VAEGDCell(tf.nn.rnn_cell.RNNCell):
     """Variational Auto Encoder cell."""
 
-    def __init__(self, adj, features, h_dim, x_dim, z_dim):
+    def __init__(self, adj, features, bias_laplace, sample, eps, k, h_dim, x_dim, z_dim):
         '''
         Args:
         adj : adjacency matrix
@@ -22,6 +22,9 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
 
         self.adj = adj
         self.features = features
+        self.bias_laplace = bias_laplace
+        self.eps = eps
+        self.k = k
         self.n_h = h_dim
         self.n_x = x_dim
         self.n_z = z_dim
@@ -30,8 +33,9 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
         self.n_enc_hidden = z_dim
         self.n_dec_hidden = x_dim
         self.n_prior_hidden = z_dim
-        self.name = self.__class__.__name__.lower()
-        self.lstm = tf.nn.rnn_cell.LSTM(self.n_h, state_is_tuple=True)
+        self.sample = sample
+        #self.name = self.__class__.__name__.lower()
+        self.lstm = tf.contrib.rnn.LSTMCell(self.n_h, state_is_tuple=True)
 
     @property
     def state_size(self):
@@ -41,7 +45,7 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
     def output_size(self):
         return self.n_h
 
-    def __call__(self, state, c_x, n, d, k, eps_passed, sample, bias_laplace, scope=None):
+    def __call__(self, c_x, state, scope=None):
         '''
 		Args:
 			c_x - tensor to be filled up with random walk property
@@ -51,6 +55,10 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
 				defaults to be None
     	'''
         c, h = state
+        n = self.adj[0].shape[0]
+        d = self.feature[0].shape[0]
+        k = self.k
+
         with tf.variable_scope(scope or type(self).__name__):
             c_x = input_layer(c_x, self.adj, self.features, k, n, d, activation=None, batch_norm=False, istrain=False,
                               scope=None)
@@ -61,7 +69,7 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
             prior_intermediate_sigma = fc_layer(prior_hidden, self.n_z, activation=tf.nn.softplus, scope="sigma")  # >=0
             prior_sigma = tf.matrix_diag(prior_intermediate_sigma, name="sigma")
 
-        c_x_1 = fc_layer(tf.matmul(bias_laplace, c_x[-1]), self.n_x_1, activation = tf.nn.relu, scope = "phi_c")# >=0
+        c_x_1 = fc_layer(tf.matmul(self.bias_laplace, c_x[-1]), self.n_x_1, activation = tf.nn.relu, scope = "phi_c")# >=0
 
         with tf.variable_scope("Encoder"):
                 list_cx = tf.unstack(c_x)
@@ -79,7 +87,7 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
 
 
         # Random sampling ~ N(0, 1)
-        eps = eps_passed
+        eps = self.eps
         # tf.random_normal((n, 5, 1), 0.0, 1.0, dtype=tf.float32)
 
         temp_stack = []
@@ -87,11 +95,11 @@ class VAEGDCell(tf.nn.rnn_cell.RNNCell):
             temp_stack.append(tf.matmul(enc_sigma[i], eps[i]))
         z = tf.add(enc_mu, tf.stack(temp_stack))
         # While we are trying to sample some edges, we sample Z from prior
-        if sample:
+        if self.sample:
             z = eps
 
         with tf.variable_scope("phi_z"):
-            z_1 = fc_layer(tf.matmul(bias_laplace, z), self.n_z_1, activation=tf.nn.relu)
+            z_1 = fc_layer(tf.matmul(self.bias_laplace, z), self.n_z_1, activation=tf.nn.relu)
 
         with tf.variable_scope("Decoder"):
                 z_stack = []
