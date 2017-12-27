@@ -110,7 +110,7 @@ class VAEG(VAEGConfig):
         else:
             print("Debug Dynamic")
             self.batch_size = 1
-            self.cell = VAEGDCell(self.adj, self.features, self.bias_laplace, hparams.sample, self.eps, self.k, self.h_dim, self.x_dim, self.z_dim)
+            self.cell = VAEGDCell(self.adj, self.features, self.basis, hparams.sample, self.eps, self.k, self.h_dim, self.x_dim, self.z_dim)
             self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
         
         if not hparams.dynamic:
