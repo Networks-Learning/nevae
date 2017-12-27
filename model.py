@@ -102,7 +102,7 @@ class VAEG(VAEGConfig):
         self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
         self.features = tf.placeholder(dtype=tf.float32, shape=[self.n, self.d], name='features')
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
-        self.eps = tf.placeholder(dtype=tf.float32, shape=[self.n, 5, 1], name='eps')
+        self.eps = tf.placeholder(dtype=tf.float32, shape=[self.n, self.z_dim, 1], name='eps')
 
         # Based on the static or dynamic case this is done
         if not hparams.dynamic:
@@ -110,7 +110,7 @@ class VAEG(VAEGConfig):
         else:
             print("Debug Dynamic")
             self.batch_size = 1
-            self.cell = VAEGDCell(self.adj, self.features, self.h_dim, self.x_dim, self.z_dim)
+            self.cell = VAEGDCell(self.adj, self.features, self.bias_laplace, hparams.sample, self.eps, self.k, self.h_dim, self.x_dim, self.z_dim)
             self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
         
         if not hparams.dynamic:
