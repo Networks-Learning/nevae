@@ -86,6 +86,8 @@ if __name__ == '__main__':
     adj, features, edges = load_data(hparams.graph_file)
     num_nodes = adj[0].shape[0]
     num_features = features[0].shape[1]
+    
+    print("edges", len(edges))
     # Training
     model = VAEG(hparams, placeholders, num_nodes, num_features, edges)
     model.initialize()

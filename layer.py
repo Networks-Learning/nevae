@@ -1,10 +1,8 @@
 import tensorflow as tf
 from utils import *
 
-#'''
 def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
     #w_in = tf.get_variable(name="w_in", shape=[k, d, 5], initializer=tf.contrib.layers.xavier_initializer())
-    # The
     w_in = tf.get_variable(name="w_in", shape=[k,d,5], initializer=tf.constant_initializer(0.5))
     w_in = tf.Print(w_in,[w_in], message="my w_in-values:")
     output_list = []
@@ -18,6 +16,7 @@ def input_layer(c_mat, adj, feature, k,n,d,activation = None, batch_norm = False
 
 
 def fc_layer(input_, output_size, activation = None, batch_norm = False, istrain = False, scope = None):
+    
     '''
     fully convlolution layer
     Args :
@@ -35,6 +34,7 @@ def fc_layer(input_, output_size, activation = None, batch_norm = False, istrain
         scope - string
             defaults to be None then scope becomes "fc"
     '''
+    
     with tf.variable_scope(scope or "fc"):
         w = tf.get_variable(name="w", shape = [get_shape(input_)[1], output_size], initializer=tf.contrib.layers.xavier_initializer())
         #w = tf.get_variable(name="w", shape = [get_shape(input_)[1], output_size], initializer=tf.constant_initializer(0.0001))

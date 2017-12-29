@@ -7,14 +7,17 @@ from numpy.linalg import svd, qr
 import glob
 
 def degree(A):
-    return np.zeros()
+    #print("DEBUG", A.shape)
+    n = A[0].shape[0]
+    degree = np.zeros((n,n))
+    for i in range(n):
+        degree[i][i] = np.sum(A[i])
+    return degree
 
 
 def construct_feed_dict(lr,dropout, k, n, d, decay, placeholders):
     # construct feed dictionary
     feed_dict = dict()
-
-
     #feed_dict.update({placeholders['features']: features})
     #feed_dict.update({placeholders['adj']: adj})
     feed_dict.update({placeholders['lr']: lr})
@@ -68,7 +71,7 @@ def basis(adj, atol=1e-13, rtol=0):
     tol = max(atol, rtol * s[0])
     rank = int((s >= tol).sum())
     q, r = qr(A)
-    return q[:rank]
+    return q
 
 def print_vars(string):
     '''print variables in collection named string'''
