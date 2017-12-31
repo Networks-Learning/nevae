@@ -60,6 +60,8 @@ class VAEG(VAEGConfig):
             #dec_out = tf.multiply(self.adj, dec_mat)
             softmax_out = tf.truediv(posscore, tf.add(posscore, negscore))
             ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))),1)
+            ll = tf.Print(ll, [ll], message="my loss values:")
+
             return (-ll)
 
         def kl_gaussian(mu_1, sigma_1,debug_sigma_1, debug_sigma_2, mu_2, sigma_2):
@@ -77,7 +79,7 @@ class VAEG(VAEGConfig):
                     temp_stack_2.append(tf.reduce_prod(debug_sigma_2[i]))
 
                 # Inverse of diaginal covariance
-                inverse_sigma_2 = tf.truediv(tf.ones(tf.shape(sigma_2)), sigma_2)
+                inverse_sigma_2 = tf.matrix_diag(tf.truediv(tf.ones(tf.shape(debug_sigma_2)), debug_sigma_2))
 
                 term_2 = []
                 for i in range(self.n):
@@ -86,15 +88,19 @@ class VAEG(VAEGConfig):
                 term_3 = []
                 k = tf.fill([self.n], tf.cast(tf.shape(mu_1)[1], tf.float32))
                 diff_mean = tf.subtract(mu_2, mu_1)
+                
                 for i in range(self.n):
                     term_3.append(tf.matmul(tf.matmul(tf.transpose(diff_mean[i]), inverse_sigma_2[i]), diff_mean[i]))
-
-                #print("Debug mu1", tf.shape(mu_1)[1])
-                return tf.reduce_sum(0.5 *
+                term_3 = tf.Print(term_3, [term_3], message="my term_3 values:")
+                KL = (0.5 *
                         (tf.log(tf.truediv(temp_stack_2, temp_stack_1)) 
                          + tf.trace(term_2) 
                          + term_3
                          - k))
+                KL = tf.Print(KL, [KL], message="my KL values:")
+
+                #print("Debug mu1", tf.shape(mu_1)[1])
+                return tf.reduce_sum(KL)
 
 
         def get_lossfunc(enc_mu, enc_sigma, enc_debug_sigma,prior_mu, prior_sigma, prior_debug_sigma, dec_out):
@@ -201,7 +207,7 @@ class VAEG(VAEGConfig):
         iteration = 1
         for epoch in range(num_epochs):
             for i in range(len(adj)):
-                for batch in range(self.n_batch:
+                for batch in range(self.n_batches):
                     print('batch', batch)
                     #for i in range(len(adj)):
                     #specific to dynamic one
@@ -254,6 +260,7 @@ class VAEG(VAEGConfig):
                 feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
                 feed_dict.update({self.eps: eps})
                 prob, ll, z = self.sess.run([self.prob, self.ll, self.z_encoded],feed_dict=feed_dict )
+                #print('LL', ll)
                 with open(hparams.z_dir+'train'+str(i)+'.txt' , 'a') as f:
                     for z_i in z:
                         f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
