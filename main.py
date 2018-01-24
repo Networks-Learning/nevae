@@ -86,7 +86,7 @@ if __name__ == '__main__':
     adj, weight, weightbin, features, edges = load_data(hparams.graph_file, hparams.nodes)
     num_nodes = adj[0].shape[0]
     num_features = features[0].shape[1]
-    #print("Debug", num_nodes, adj[0][0])
+    #print("Debug", num_nodes, adj[0], edges)
     # Training
     model = VAEG(hparams, placeholders, num_nodes, num_features, edges)
     model.initialize()

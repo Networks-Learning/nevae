@@ -202,9 +202,9 @@ class VAEG(VAEGConfig):
             return (True, -1, -1, -1, -1)
         weight_mat = np.zeros([self.n, self.n])
         #print("Debug ", len(self.edges[i]), self.seq_size)
-        for (u, v) in self.edges[i][: self.current + self.seq_size]:
-            weight_mat[u][v] += 1
-            weight_mat[v][u] += 1
+        for (u, v, w) in self.edges[i][: self.current + self.seq_size]:
+            weight_mat[u][v] += w
+            weight_mat[v][u] += w
         self.current = self.current + self.seq_size
         feature, weight_bin, adj, indicator = calculate_feature(weight_mat, self.bin_dim)
         bias_matrix = basis(adj)
@@ -233,7 +233,7 @@ class VAEG(VAEGConfig):
                 # sequence size and batch size is 1
                 final_state_c, final_state_h = np.zeros((1, self.h_dim)), np.zeros((1, self.h_dim))
                 #self.cell.zero_state(batch_size=1, dtype=tf.float32)
-                print("DEBUG LEN",len(self.edges[i]) / self.n_seq)
+                #print("DEBUG LEN",len(self.edges[i]) / self.n_seq)
                 self.current = 0
                 self.seq_size = int(ceil(len(self.edges[i]) / self.n_seq))
                 for seq in range(self.n_seq):
@@ -241,7 +241,7 @@ class VAEG(VAEGConfig):
                     #for i in range(len(adj)):
                     #specific to dynamic one
                     finished, adjnew, basis, features, weight_bin, weight, indicator = self.next_seq(i)
-                    #print("DEBUG RAW DATA", weight_bin.shape)
+                    #print("DEBUG RAW DATA adjnew", adjnew, "indicator:", indicator, "weight:", weight)
                     # Learning rate decay
                     #self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
 

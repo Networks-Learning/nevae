@@ -171,7 +171,8 @@ def load_data(filename, num=0, bin_dim=3):
     weight_binlist = []
     edgelist = []
     #for findex in range(40):
-    filenumber = int(len(glob.glob(path)) * 0.8)
+    filenumber = 1
+    #filenumber = int(len(glob.glob(path)) * 0.8)
     for fname in sorted(glob.glob(path))[:filenumber]:
         #fname = filename+"/"+str(findex+1)+".edgelist"
         #fname = filename+"/"+str(findex+1)+".txt"
@@ -219,7 +220,11 @@ def load_data(filename, num=0, bin_dim=3):
                 if int(u) > int(v):
                     bfs_edgelist[i] = (v, u)
             diff_edges = list(set(totaledgelist) - set(bfs_edgelist))
-            edgelist.append(bfs_edgelist+diff_edges)
+            temp_list = []
+            for (u,v) in (bfs_edgelist + diff_edges):
+                
+                temp_list.append((u, v, G[u][v]['weight']))
+            edgelist.append(temp_list)
             weightlist.append(weight)
             weight_binlist.append(weight_bin)
             featurelist.append(degreemat)
@@ -245,7 +250,7 @@ def calculate_feature(weight, bin_dim):
             for v in range(n):
                 degv = np.sum(adj[u])
                 degu = np.sum(adj[v])
-                if degv <= 5 and degu <= 5:
+                if degv > 5 or degu > 5:
                     degreeindicator[u][v] = 0
 
         
