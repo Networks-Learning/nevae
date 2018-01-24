@@ -9,18 +9,28 @@ import scipy
 from numpy.linalg import svd, qr, norm
 import glob
 
-def normalise_prob(prob, weight, n, bin_dim, seen_list):
-    
-    for i in range(self.n):
-        for j in range(i+1, self.n):
-            if (i,j) in seen_list:
-                #prins
-                if (i,j) in list_edges:
-                    list_edges.remove((i,j))
-                    continue
-            problist.append(prob[i][j])
+def normalise_weighted(prob, weight, n, bin_dim, seen_list, list_edges, indicator):
+
+
+    prob = np.multiply(np.reshape(prob, [n, n]), indicator)
+    weight = np.reshape(weight, [n, n, bin_dim])
+    problist = []
+    for i in range(n):
+        for j in range(i+1, n):
+            if (i, j, 1) in seen_list or (i, j, 2) in seen_list or (i, j, 3) in seen_list:
+                if (i, j, 1) in list_edges:
+                    list_edges.remove((i, j, 1))
+                if (i, j, 2) in list_edges:
+                    list_edges.remove((i, j, 2))
+                if (i, j, 3) in list_edges:
+                    list_edges.remove((i, j, 3))
+                continue
+
+            problist.extend(prob[i][j] * weight[i][j])
     p = np.array(problist)
     p /= p.sum()
+
+    return list_edges, p
 
 def normalise(prob, weight, n, bin_dim):
     p_rs = prob
@@ -218,9 +228,11 @@ def load_data(filename, num=0, bin_dim=3):
         #print fname
     return (adjlist, weightlist, weight_binlist, featurelist, edgelist)
     #return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
+
 def calculate_feature(weight, bin_dim):
         n = len(weight[0])
         degreemat = np.zeros((n, 1), dtype=np.float)
+        degreeindicator = np.ones((n, n), dtype=np.float)
         adj = np.zeros([n,n])
         weight_bin = np.zeros([n,n,bin_dim])
         for i in range(n):
@@ -230,8 +242,14 @@ def calculate_feature(weight, bin_dim):
                 weight_bin[i][j][int(weight[i][j])] = 1
         for u in range(n):
             degreemat[int(u)][0] = np.sum(adj[u])//n
+            for v in range(n):
+                degv = np.sum(adj[u])
+                degu = np.sum(adj[v])
+                if degv <= 5 and degu <= 5:
+                    degreeindicator[u][v] = 0
+
         
-        return degreemat, weight_bin, adj
+        return degreemat, weight_bin, adj, degreeindicator
 
 def proxy(filename, perm = False):
         print "filename", filename
