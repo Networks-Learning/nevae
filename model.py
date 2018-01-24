@@ -5,6 +5,7 @@ from datetime import datetime
 from cell import VAEGCell
 from dynamiccell import VAEGDCell
 
+from math import ceil, log
 import tensorflow as tf
 import numpy as np
 import logging
@@ -31,14 +32,15 @@ class VAEG(VAEGConfig):
         self.edges = edges
         self.z_dim = hparams.z_dim
         self.x_dim = hparams.z_dim
-        self.h_dim = hparams.h_dim
-        self.n_batches = hparams.n_batches
-        self.batch_size = 10
+        self.h_dim = num_nodes
+        self.n_seq = hparams.n_seq
+        self.seq_size = 0
         self.current = 0
+        self.bin_dim = hparams.bin_dim
         #self.edges, self.non_edges = edges, non_edges
 
         #logger.info("Building model starts...")
-        def neg_loglikelihood(prob_dict):
+        def neg_loglikelihood(prob_dict, w_edge):
             '''
             negative loglikelihood of the edges
             '''
@@ -47,21 +49,37 @@ class VAEG(VAEGConfig):
                 dec_mat = tf.exp(tf.minimum(tf.reshape(prob_dict, [self.n, self.n]),tf.fill([self.n, self.n], 10.0)))
                 dec_mat = tf.Print(dec_mat, [dec_mat], message="my decscore values:")
                 print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
+                w_edge_new = tf.reshape(w_edge, [self.n, self.n, self.bin_dim])
+            print("DEBUG weight bin", self.weight_bin.shape)
+            weight_temp = tf.multiply(self.weight_bin, w_edge_new)
+            weight_stack = []
+            weight_negative = []
+            #np.zeros([self.n, self.n])
+            for i in range(self.n):
+                for j in range(self.n):
+                    weight_stack.append(tf.reduce_sum(weight_temp[i][j]))
+                    weight_negative.append(tf.reduce_sum(w_edge_new[i][j]))
+            weight_stack = tf.reshape(weight_stack, [self.n, self.n])
+            weight_negative = tf.reshape(weight_negative, [self.n, self.n])
+            w_score = tf.truediv(weight_stack, weight_negative)
+            
             comp = tf.subtract(tf.ones([self.n, self.n], tf.float32), self.adj)
             comp = tf.Print(comp, [comp], message="my comp values:")
 
-            temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
+            #temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
+            temp = tf.reduce_sum(tf.multiply(tf.multiply(comp,dec_mat), w_score))
             negscore = tf.fill([self.n,self.n], temp+1e-9)
             negscore = tf.Print(negscore, [negscore], message="my negscore values:")
 
             posscore = tf.multiply(self.adj, dec_mat)
             posscore = tf.Print(posscore, [posscore], message="my posscore values:")
 
+            posweightscore = tf.multiply(posscore, w_score)
+            posweightscore = tf.Print(posweightscore, [posweightscore], message="my weighted posscore")
             #dec_out = tf.multiply(self.adj, dec_mat)
-            softmax_out = tf.truediv(posscore, tf.add(posscore, negscore))
+            softmax_out = tf.truediv(posscore, tf.add(posweightscore, negscore))
             ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))),1)
-            ll = tf.Print(ll, [ll], message="my loss values:")
-
+            #ll = tf.Print(ll, [ll], message="my loss values:")
             return (-ll)
 
         def kl_gaussian(mu_1, sigma_1,debug_sigma_1, debug_sigma_2, mu_2, sigma_2):
@@ -70,7 +88,7 @@ class VAEG(VAEGConfig):
             '''
             #print("Debug sigma1", debug_sigma_1, len(debug_sigma_1[0]))
             #print sigma_1.shape, sigma_2.shape
-            with tf.variable_scope("kl_gaussisan"):
+            with tf.variable_scope("kl_gaussian"):
                 temp_stack_1 = []
                 temp_stack_2 = []
                 for i in range(self.n):
@@ -102,17 +120,18 @@ class VAEG(VAEGConfig):
                 #print("Debug mu1", tf.shape(mu_1)[1])
                 return tf.reduce_sum(KL)
 
-
-        def get_lossfunc(enc_mu, enc_sigma, enc_debug_sigma,prior_mu, prior_sigma, prior_debug_sigma, dec_out):
+        def get_lossfunc(enc_mu, enc_sigma, enc_debug_sigma,prior_mu, prior_sigma, prior_debug_sigma, dec_out, w_edge):
                 kl_loss = kl_gaussian(enc_mu, enc_sigma, enc_debug_sigma,prior_debug_sigma,prior_mu, prior_sigma)  # KL_divergence loss
-                likelihood_loss = neg_loglikelihood(dec_out)  # Cross entropy loss
+                likelihood_loss = neg_loglikelihood(dec_out, w_edge)  # Cross entropy loss
                 self.ll = likelihood_loss
+            
                 return tf.reduce_mean(kl_loss + likelihood_loss)
-
 
         self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
         self.features = tf.placeholder(dtype=tf.float32, shape=[self.n, self.d], name='features')
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
+        self.weight = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='weight')
+        self.weight_bin = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n, self.bin_dim], name='weight_bin')
         self.eps = tf.placeholder(dtype=tf.float32, shape=[self.n, self.z_dim, 1], name='eps')
         self.basis = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='basis')
 
@@ -122,7 +141,7 @@ class VAEG(VAEGConfig):
         else:
             print("Debug Dynamic")
             #sel.batch_size = self.n
-            self.cell = VAEGDCell(self.adj, self.features, self.basis, hparams.sample, self.eps, self.k, self.h_dim, self.x_dim, self.z_dim)
+            self.cell = VAEGDCell(self.adj, self.features, self.basis, hparams.sample, self.eps, self.k, self.h_dim, self.x_dim, self.z_dim, self.bin_dim)
             self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=1, dtype=tf.float32)
         
         if not hparams.dynamic:
@@ -133,24 +152,25 @@ class VAEG(VAEGConfig):
             #c_x, enc_mu, enc_sigma, enc_intermediate_sigma, dec_hidden, prior_mu, prior_sigma, prior_intermediate_sigma, z
             #(self.c_x, enc_mu, enc_sigma, debug_sigma1, dec_out, prior_mu, prior_sigma, debug_sigma2, z_encoded), last_state = \
             #self.c_x, enc_mu, enc_sigma, debug_sigma1,dec_out, prior_mu, prior_sigma, debug_sigma2, z_encoded = a
-            a, b = tf.contrib.rnn.static_rnn(self.cell, [self.input_data], initial_state=(self.initial_state_c, self.initial_state_h))
-            print("Debug a", a) 
+            outputs, last_state = tf.contrib.rnn.static_rnn(self.cell, [self.input_data], initial_state=(self.initial_state_c, self.initial_state_h))
+            #print("Debug a", a) 
             #self.c_x, enc_mu, enc_sigma, debug_sigma1,dec_out, prior_mu, prior_sigma, debug_sigma2, z_encoded = a
 
             #names = ["enc_mu", "enc_sigma", "dec_mu", "dec_sigma", "dec_rho", "prior_mu", "prior_sigma"]
-            names = ["c_x", "enc_mu", "enc_sigma", "enc_intermediate_sigma", "dec_hidden", "prior_mu", "prior_sigma", "prior_intermediate_sigma", "z"]
-            outputs = []
-
+            names = ["c_x", "enc_mu", "enc_sigma", "enc_intermediate_sigma", "dec_hidden", "prior_mu", "prior_sigma", "prior_intermediate_sigma", "z", "weight"]
+            outputs_decoupled = []
+            
             for n,name in enumerate(names):
                 with tf.variable_scope(name):
-                    for o in a:
+                    for o in outputs:
                         x =o[n]
                     #x = [o[n] for o in a]
-                        outputs.append(x)
-            print("Debug 1", outputs, len(outputs))
-            self.c_x, enc_mu, enc_sigma, debug_sigma1,dec_out, prior_mu, prior_sigma, debug_sigma2, z_encoded = outputs
+                        outputs_decoupled.append(x)
+            print("Debug 1", outputs_decoupled, len(outputs_decoupled))
+            self.c_x, enc_mu, enc_sigma, debug_sigma1,dec_out, prior_mu, prior_sigma, debug_sigma2, z_encoded, self.w_edge = outputs_decoupled
+            self.final_state_c,self.final_state_h = last_state
             #print("Debug 2", debug_sigma1, debug_sigma2.shape)
-            self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma1, prior_mu, prior_sigma, debug_sigma2, dec_out)
+            self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma1, prior_mu, prior_sigma, debug_sigma2, dec_out, self.w_edge)
         self.prob = dec_out
         self.z_encoded = z_encoded
         #self.cost = get_lossfunc(enc_mu, enc_sigma, debug_sigma1,prior_mu, prior_sigma, debug_sigma2, dec_out)
@@ -174,27 +194,29 @@ class VAEG(VAEGConfig):
         print("Load the model from {}".format(ckpt.model_checkpoint_path))
         saver.restore(self.sess, ckpt.model_checkpoint_path)
 
-    def next_batch(self, i):
+    def next_seq(self, i):
         if self.current >= len(self.edges[i]):
-            return False
-        adj = np.zeros([self.n, self.n])
-        print("Debug ", len(self.edges[i]), self.batch_size)
-        for (u,v) in self.edges[i][self.current: self.current + self.batch_size]:
+            return (True, -1, -1, -1)
+        weight_mat = np.zeros([self.n, self.n])
+        #print("Debug ", len(self.edges[i]), self.seq_size)
+        for (u,v) in self.edges[i][: self.current + self.seq_size]:
         #for (u,v) in edge_list:
-            adj[u][v] = 1
-            adj[v][u] = 1
+            weight_mat[u][v] += 1
+            weight_mat[v][u] += 1
+        #bias_matrix = basis(adj)
+        self.current = self.current + self.seq_size
+        feature, weight_bin, adj = calculate_feature(weight_mat, self.bin_dim)
         bias_matrix = basis(adj)
-        self.current = self.current + self.batch_size
-        feature = calculate_feature(adj)
-        return (adj, bias_matrix, feature)
+        #print()
+        return (False, adj, bias_matrix, feature, weight_bin, weight_mat)
 
-    def train(self,placeholders, hparams, adj, features):
+    def train(self,placeholders, hparams, adj, features, edges):
         savedir = hparams.out_dir
         lr = hparams.learning_rate
         dr = hparams.dropout_rate
         decay = hparams.decay_rate
 
-        # training
+        #training
         num_epochs = hparams.num_epochs
         create_dir(savedir)
         ckpt = tf.train.get_checkpoint_state(savedir)
@@ -203,16 +225,23 @@ class VAEG(VAEGConfig):
         if ckpt:
             saver.restore(self.sess, ckpt.model_checkpoint_path)
             print("Load the model from %s" % ckpt.model_checkpoint_path)
-
+        
         iteration = 1
+
         for epoch in range(num_epochs):
             for i in range(len(adj)):
-                for batch in range(self.n_batches):
-                    print('batch', batch)
+                # sequence size and batch size is 1
+                final_state_c, final_state_h = np.zeros((1, self.h_dim)), np.zeros((1, self.h_dim))
+                #self.cell.zero_state(batch_size=1, dtype=tf.float32)
+                print("DEBUG LEN",len(self.edges[i]) // self.n_seq)
+                self.current = 0
+                self.seq_size = int(ceil(len(self.edges[i]) // self.n_seq))
+                for seq in range(self.n_seq):
+                    #print('batch', batch)
                     #for i in range(len(adj)):
                     #specific to dynamic one
-                    adjnew, basis, features = self.next_batch(i)
-
+                    finished, adjnew, basis, features, weight_bin, weight = self.next_seq(i)
+                    print("DEBUG RAW DATA", weight_bin.shape) 
                     # Learning rate decay
                     #self.sess.run(tf.assign(self.lr, self.lr * (self.decay ** epoch)))
 
@@ -221,12 +250,18 @@ class VAEG(VAEGConfig):
                     # sampled random from standard normal distribution
                     eps = np.random.randn(self.n, self.z_dim, 1)
                     feed_dict.update({self.eps: eps})
-
+                    
                     # The graph properties of the graph
                     feed_dict.update({self.adj: adjnew})
                     feed_dict.update({self.features: features})
                     feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
                     feed_dict.update({self.basis: basis})
+                    feed_dict.update({self.weight_bin: weight_bin})
+                    feed_dict.update({self.weight: weight})
+                    feed_dict.update({self.initial_state_c: final_state_c})
+                    feed_dict.update({self.initial_state_h: final_state_h})
+                    #self.initial_state_c, self.initial_state_h = self.cell.zero_state(batch_size=1, dtype=tf.float32)
+
                     '''
                     print("Debug grad", self.grad)
                     for g in self.grad:
@@ -236,15 +271,16 @@ class VAEG(VAEGConfig):
                     for j in xrange(len(self.grad_placeholder)):
                         feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
                     '''
-                    input_, train_loss, _, probdict, cx= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob, self.c_x], feed_dict=feed_dict)
+                    input_, train_loss, _, probdict, cx, final_state_c, final_state_h = self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob, self.c_x, self.final_state_c, self.final_state_h], feed_dict=feed_dict)
 
                     iteration += 1
                     if iteration % hparams.log_every == 0 and iteration > 0:
-                        print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs * self.n_batches, epoch+1, train_loss))
+                        print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, epoch*len(adj)*seq, num_epochs*len(adj)*self.n_seq, train_loss))
                         checkpoint_path = os.path.join(savedir, 'model.ckpt')
                         saver.save(self.sess, checkpoint_path, global_step=iteration)
                         logger.info("model saved to {}".format(checkpoint_path))
 
+  
 
 
 
@@ -279,7 +315,73 @@ class VAEG(VAEGConfig):
                     for z_i in z:
                         f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
 
-    def sample_graph(self, hparams, placeholders, s_num, num=10, outdir=None):
+    
+    
+    def get_stat(self, hparams, edges, placeholders):
+        
+        num_edges = hparams.sample_edge
+        #edges_seq = 1
+        edges_seq = int(ceil(num_edges // self.n_seq))
+        k = 0
+        final_state_c, final_state_h = np.zeros((1, self.h_dim)), np.zeros((1, self.h_dim))
+        feature = np.zeros([self.n, 1], dtype=np.float)
+        adj = np.zeros([self.n, self.n])
+        probtotal = 0.0
+        print("Debug edges", edges, edges_seq)
+        
+        while k < num_edges:
+            #if k == 0:
+            #    candidate_edges = edges[:1]
+            #else:
+            candidate_edges = edges[k:k+edges_seq]
+            for (u,v) in candidate_edges:
+                adj[u][v] = 1
+                adj[v][u] = 1
+        
+            for i in range(self.n):
+                feature[i][0] =  np.sum(adj[i])//(self.n - 1)
+            
+            basis_matrix = basis(adj)
+
+            eps = np.random.randn(self.n, self.z_dim, 1) 
+            feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
+            feed_dict.update({self.adj: adj})
+            feed_dict.update({self.features: feature})
+            feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
+            feed_dict.update({self.eps: eps})
+            #feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
+            feed_dict.update({self.basis: basis_matrix})
+
+            feed_dict.update({self.initial_state_c: final_state_c})
+            feed_dict.update({self.initial_state_h: final_state_h})
+
+            prob, ll, final_state_c, final_state_h, loss = self.sess.run([self.prob, self.ll, self.final_state_c, self.final_state_h, self.cost],feed_dict=feed_dict )
+        
+            prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
+            prob = np.divide(prob, np.sum(prob))
+            k += edges_seq
+            
+            #probtotal = 0.0
+            
+            for (u,v) in candidate_edges:
+                #print("Debug prob", prob[u][v], u, v)
+                probtotal += log(prob[u][v])
+        probtotal_end = 0.0
+        for (u,v) in edges:
+                #print("Debug prob", prob[u][v], u, v)
+                probtotal_end += log(prob[u][v])
+
+        with open(hparams.sample_file+ "/reconstruntion_loss.txt", "a") as fw:
+            fw.write(str(-np.mean(ll))+"\n")
+        with open(hparams.sample_file+ "/prob_derived_end.txt", "a") as fw:
+            fw.write(str(probtotal_end)+"\n")
+        with open(hparams.sample_file+ "/prob_derived_inter.txt", "a") as fw:
+            fw.write(str(probtotal)+"\n")
+        with open(hparams.sample_file+ "/elbo.txt", "a") as fw:
+            fw.write(str(-np.mean(loss))+"\n")
+
+
+    def sample_graph(self, hparams, placeholders,s_num,  outdir=None):
         '''
         Args :
             num - int
@@ -288,53 +390,107 @@ class VAEG(VAEGConfig):
             outdir - string
                 output dir
             
+
         '''
+        num_edges = hparams.sample_edge
+        edges_seq = int(ceil(num_edges // self.n_seq))
         list_edges = []
         for i in range(self.n):
             for j in range(i+1, self.n):
-                    list_edges.append((i,j))
+                    list_edges.append((i, j, 1))
+                    list_edges.append((i, j, 2))
+                    list_edges.append((i, j, 3))
+
+        #prev_state = sess.run(self.cell.zero_state(1, tf.float32))
+        eps = np.random.randn(self.n, self.z_dim, 1) 
+        hparams.sample = True
+        seen_list = []
+        candidate_edges =[ list_edges[i] for i in random.sample(range(len(list_edges)), 1)]
+        seen_list.extend(candidate_edges)
         
-        candidate_edges =[ list_edges[i] for i in random.sample(range(len(list_edges)), num)]
         adj = np.zeros([self.n, self.n])
+        weight_mat = np.zeros([self.n, self.n])
+        weight_bin = np.zeros([self.n, self.n, self.bin_dim])
+
         for (u,v) in candidate_edges:
             adj[u][v] = 1
             adj[v][u] = 1
+            
+            weight_mat[u][v]+=1
+            weight_mat[v][u]+=1
+
+            weight_bin[u][v][weight_mat[u][v]] = 1
+            weight_bin[v][u][weight_mat[v][u]] = 1
+
+        final_state_c, final_state_h = np.zeros((1, self.h_dim)), np.zeros((1, self.h_dim))
+        #self.cell.zero_state(batch_size=1, dtype=tf.float32)
         
-        deg = np.zeros([self.n, 1], dtype=np.float)
-
+        feature = np.zeros([self.n, 1], dtype=np.float)
         for i in range(self.n):
-            deg[i][0] = 2 * np.sum(adj[i])/(self.n*(self.n - 1))
+            feature[i][0] =  np.sum(adj[i])//(self.n - 1)
 
-        eps = np.random.randn(self.n, 5, 1) 
-        with open(hparams.z_dir+'test_prior_'+str(s_num)+'.txt', 'a') as f:
-                    for z_i in eps:
-                        f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
+        basis_matrix = basis(adj)
 
-        #tf.random_normal((self.n, 5, 1), 0.0, 1.0, dtype=tf.float32)
+        eps = np.random.randn(self.n, self.z_dim, 1) 
         feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
         feed_dict.update({self.adj: adj})
-        feed_dict.update({self.features: deg})
+        feed_dict.update({self.features: feature})
         feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
         feed_dict.update({self.eps: eps})
-        prob, ll = self.sess.run([self.prob, self.ll],feed_dict=feed_dict )
-        
-        prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
-        prob = np.divide(prob, np.sum(prob))
+        feed_dict.update({self.weight:weight_mat })
+        feed_dict.update({self.weight_bin:weight_bin })
+        feed_dict.update({self.basis: basis_matrix })
+        feed_dict.update({self.initial_state_c: final_state_c})
+        feed_dict.update({self.initial_state_h: final_state_h})
 
-        problist  = []
+        prob, weight, ll, final_state_c, final_state_h = self.sess.run([self.prob, self.w_edge, self.ll, self.final_state_c, self.final_state_h],feed_dict=feed_dict )
+        
+        problist  = normalise_new(prob, weight)
+        
+        candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[edges_seq - 1], p=p, replace=False)]
+        seen_list.extend(candidate_edges)
+        
+        while k < num_edges:
+            for (u,v) in candidate_edges:
+                adj[u][v] = 1
+                adj[v][u] = 1
+                weight_mat[u][v] += 1
+                weight_mat[v][u] += 1
+
+            for i in range(self.n):
+                for j in range(self.n):
+                    weight_bin[u][v][weight_mat[i][j]] = 1
+
+            for i in range(self.n):
+                feature[i][0] =  np.sum(adj[i]) * 1.0 / (self.n - 1)
+
+            basis_matrix = basis(adj)
+
+            eps = np.random.randn(self.n, self.z_dim, 1) 
+            
+            feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
+            feed_dict.update({self.adj: adj})
+            feed_dict.update({self.features: feature})
+            feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
+            feed_dict.update({self.eps: eps})
+            feed_dict.update({self.basis: basis_matrix})
+            feed_dict.update({self.initial_state_c: final_state_c})
+            feed_dict.update({self.initial_state_h: final_state_h})
+
+            #prob, ll, final_state_c, final_state_h = self.sess.run([self.prob, self.ll, self.final_state_c, self.final_state_h],feed_dict=feed_dict )
+            prob, weight, ll, final_state_c, final_state_h = self.sess.run([self.prob, self.w_edge, self.ll, self.final_state_c, self.final_state_h],feed_dict=feed_dict )
+        
+            prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
+            prob = np.divide(prob, np.sum(prob))
+
+            problist = normalise_new(prob, weight)
+            
+            candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[min(edges_seq, num_edges - k)], p=p, replace=False)]
+            seen_list.extend(candidate_edges) 
+            k += edges_seq
+        
         for i in range(self.n):
-            for j in range(i+1, self.n):
-                problist.append(prob[i][j])
-        p = np.array(problist)
-        p /= p.sum()
-        
-        candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[num], p=p, replace=False)]
-
-        for (u,v) in candidate_edges:
-            with open(hparams.sample_file+str(s_num)+'.txt', 'a') as f:
-                        f.write(str(u)+' '+str(v)+' {}'+'\n')
-
-        ll1 = np.mean(ll)
-    
-        with open(hparams.sample_file+'/ll.txt', 'a') as f:
-            f.write(str(ll1)+'\n')
+           for j in range(i+1, self.n):
+               if adj[i][j] == 1:
+                   with open(hparams.sample_file+"approach_2"+str(s_num)+".txt", "a") as fw:
+                        fw.write(str(i)+" " + str(j)+ " {}\n")

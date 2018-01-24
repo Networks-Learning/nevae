@@ -1,5 +1,5 @@
-from utils import *
-#create_dir, pickle_save, print_vars, load_data, get_shape, proxy
+
+from utils import create_dir, pickle_save, print_vars, load_data, get_shape
 from config import SAVE_DIR, VAEGConfig
 from datetime import datetime
 from cell import VAEGCell
@@ -34,19 +34,16 @@ def add_arguments(parser):
     parser.add_argument("--sample_file", type=str, default=None, help="directory to store the sample graphs")
 
     parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
-    parser.add_argument("--z_dim", type=int, default=5, help="z_dim")
-
-
+    #parser.add_argument("--h_dim", type=int, default=5, help="hidden state RNN dimension")
+    parser.add_argument("--z_dim", type=int, default=5, help="latent space dimension")
     parser.add_argument("--n_seq", type=int, default=5, help="number of edges to process in a seq")
-    parser.add_argument("--bin_dim", type=int, default=5, help="bin_dim")
-    parser.add_argument("--nodes", type=int, default=5, help="nodes")
-    parser.add_argument("--dynamic", type=bool, default=False, help="nodes")
-
     parser.add_argument("--graph_file", type=str, default=None,
-                        help="The dictory where the training graph structure is saved")
+                        help="The directory where the training graph structure is saved")
+
     parser.add_argument("--z_dir", type=str, default=None,
                         help="The z values will be stored file to be stored")
     parser.add_argument("--sample", type=bool, default=False, help="True if you want to sample")
+    parser.add_argument("--dynamic", type=bool, default=False, help="True if you want to learn dynamic graphs")
 
     parser.add_argument("--out_dir", type=str, default=None,
                         help="Store log/model files.")
@@ -59,7 +56,6 @@ def create_hparams(flags):
       out_dir=flags.out_dir,
       z_dir=flags.z_dir,
       sample_file=flags.sample_file,
-      z_dim=flags.z_dim,
 
       # training
       learning_rate=flags.learning_rate,
@@ -68,12 +64,17 @@ def create_hparams(flags):
       num_epochs=flags.num_epochs,
       random_walk=flags.random_walk,
       log_every=flags.log_every,
-      nodes=flags.nodes,
-      bin_dim=flags.bin_dim,
-      dynamic=flags.dynamic,
-      n_seq=flags.n_seq,
+
       #sample
-      sample=flags.sample
+      sample=flags.sample,
+
+      #static or dynamic
+      dynamic=flags.dynamic,
+
+      #size of network
+      z_dim=flags.z_dim,
+      #h_dim=flags.h_dim,
+      n_seq=flags.n_seq
       )
 
 if __name__ == '__main__':
@@ -81,17 +82,17 @@ if __name__ == '__main__':
     add_arguments(nmt_parser)
     FLAGS, unparsed = nmt_parser.parse_known_args()
     hparams = create_hparams(FLAGS)
-    
     # loading the data from a file
-    adj, weight, weightbin, features, edges = load_data(hparams.graph_file, hparams.nodes)
+    adj, features, edges = load_data(hparams.graph_file, 30)
     num_nodes = adj[0].shape[0]
     num_features = features[0].shape[1]
-    #print("Debug", num_nodes, adj[0][0])
+    
+    print("edges", len(edges[0]))
+    print("Adj", adj[0])
     # Training
     model = VAEG(hparams, placeholders, num_nodes, num_features, edges)
     model.initialize()
-    model.train(placeholders, hparams, adj, features, edges)
-
+    model.train(placeholders, hparams, adj, features)
     
     #Test code
     '''
