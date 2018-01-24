@@ -11,9 +11,12 @@ import glob
 
 def normalise_weighted(prob, weight, n, bin_dim, seen_list, list_edges, indicator):
 
-
-    prob = np.multiply(np.reshape(prob, [n, n]), indicator)
+    prob = np.reshape(prob, [n, n])
+    
+    #prob = np.multiply(np.reshape(prob, [n, n]), indicator)
+    print "Debug: Prob", prob
     weight = np.reshape(weight, [n, n, bin_dim])
+    weight = np.multiply(weight, indicator)
     problist = []
     for i in range(n):
         for j in range(i+1, n):
@@ -171,8 +174,8 @@ def load_data(filename, num=0, bin_dim=3):
     weight_binlist = []
     edgelist = []
     #for findex in range(40):
-    filenumber = 1
-    #filenumber = int(len(glob.glob(path)) * 0.8)
+    #filenumber = 1
+    filenumber = int(len(glob.glob(path)) * 0.9)
     for fname in sorted(glob.glob(path))[:filenumber]:
         #fname = filename+"/"+str(findex+1)+".edgelist"
         #fname = filename+"/"+str(findex+1)+".txt"
@@ -237,22 +240,29 @@ def load_data(filename, num=0, bin_dim=3):
 def calculate_feature(weight, bin_dim):
         n = len(weight[0])
         degreemat = np.zeros((n, 1), dtype=np.float)
-        degreeindicator = np.ones((n, n), dtype=np.float)
+        #degreeindicator = np.ones((n,n), dtype=np.float)
+        degreeindicator = np.ones((n, n, bin_dim), dtype=np.float)
         adj = np.zeros([n,n])
         weight_bin = np.zeros([n,n,bin_dim])
+        #weight_bin = np.zeros([n, n])
         for i in range(n):
             for j in range(n):
                 if weight[i][j]>0:
                     adj[i][j] = 1
-                weight_bin[i][j][int(weight[i][j])] = 1
+                    weight_bin[i][j][int(weight[i][j])-1] = 1
         for u in range(n):
             degreemat[int(u)][0] = np.sum(adj[u])//n
             for v in range(n):
                 degv = np.sum(adj[u])
                 degu = np.sum(adj[v])
-                if degv > 5 or degu > 5:
-                    degreeindicator[u][v] = 0
-
+                if degv >= 5 or degu >= 5:
+                    degreeindicator[u][v][0] = 0
+                if degv >=4 or degu >=4:
+                    degreeindicator[u][v][1] = 0
+                if degv >=3 or degu >=3:
+                    degreeindicator[u][v][2] = 0 
+                
+                degreeindicator[v][u] = degreeindicator[u][v]
         
         return degreemat, weight_bin, adj, degreeindicator
 

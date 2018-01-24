@@ -39,6 +39,7 @@ def add_arguments(parser):
     parser.add_argument("--graph_file", type=str, default=None,
                         help="The directory where the training graph structure is saved")
 
+    parser.add_argument("--bin_dim", type=int, default=3, help="types of edges dimension")
     parser.add_argument("--z_dir", type=str, default=None,
                         help="The z values will be stored file to be stored")
     parser.add_argument("--sample", type=bool, default=False, help="True if you want to sample")
@@ -73,6 +74,7 @@ def create_hparams(flags):
       sample=flags.sample,
       sample_node=flags.sample_node,
       sample_edge=flags.sample_edge,
+      bin_dim=flags.bin_dim,
 
       #static or dynamic
       dynamic=flags.dynamic,
@@ -89,11 +91,11 @@ if __name__ == '__main__':
     FLAGS, unparsed = nmt_parser.parse_known_args()
     hparams = create_hparams(FLAGS)
     # loading the data from a file
-    adj, features, edges = load_data(hparams.graph_file, hparams.sample_node)
-    num_nodes = adj[0].shape[0]
-    num_features = features[0].shape[1]
+    #adj, weight, weightbin, features, edges = load_data(hparams.graph_file, hparams.sample_node)
+    #num_nodes = adj[0].shape[0]
+    #num_features = features[0].shape[1]
     
-    print("edges", edges[0], edges[1])
+    #print("edges", edges[0], edges[1])
     #print("Adj", adj[0])
     # Training
     #model = VAEG(hparams, placeholders, num_nodes, num_features, edges)
@@ -110,7 +112,7 @@ if __name__ == '__main__':
     #    model2.get_stat(hparams, edge, placeholders)
 
     #model2.get_stat()
-    while i < 5:
+    while i < 100:
         model2.sample_graph(hparams, placeholders, i)
         i += 1
     #model2.plot_hspace(hparams, placeholders, 10)    

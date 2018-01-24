@@ -49,13 +49,14 @@ class VAEG(VAEGConfig):
                 dec_mat = tf.exp(tf.minimum(tf.reshape(prob_dict, [self.n, self.n]),tf.fill([self.n, self.n], 10.0)))
                 dec_mat = tf.Print(dec_mat, [dec_mat], message="my decscore values:")
                 print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
-                w_edge_new = tf.reshape(w_edge, [self.n, self.n, self.bin_dim])
+                w_edge_new = tf.exp(tf.reshape(w_edge, [self.n, self.n, self.bin_dim]))
             #print("DEBUG weight bin", self.weight_bin.shape)
-            weight_temp = tf.multiply(self.weight_bin, w_edge_new)
+            weight_temp = tf.multiply(tf.multiply(self.weight_bin, w_edge_new), self.indicator) 
+            #weight_temp = tf.multiply(self.weight_bin, w_edge_new)
             weight_stack = []
             weight_negative = []
             #np.zeros([self.n, self.n])
-            dec_mat = tf.multiply(dec_mat, self.indicator)
+            #dec_mat = tf.multiply(dec_mat, self.indicator)
             for i in range(self.n):
                 for j in range(self.n):
                     weight_stack.append(tf.reduce_sum(weight_temp[i][j]))
@@ -67,8 +68,8 @@ class VAEG(VAEGConfig):
             comp = tf.subtract(tf.ones([self.n, self.n], tf.float32), self.adj)
             comp = tf.Print(comp, [comp], message="my comp values:")
 
-            #temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
-            temp = tf.reduce_sum(tf.multiply(tf.multiply(comp,dec_mat), w_score))
+            temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
+            #temp = tf.reduce_sum(tf.multiply(tf.multiply(comp,dec_mat), w_score))
             negscore = tf.fill([self.n,self.n], temp+1e-9)
             negscore = tf.Print(negscore, [negscore], message="my negscore values:")
 
@@ -78,10 +79,11 @@ class VAEG(VAEGConfig):
             posweightscore = tf.multiply(posscore, w_score)
             posweightscore = tf.Print(posweightscore, [posweightscore], message="my weighted posscore")
             #dec_out = tf.multiply(self.adj, dec_mat)
-            softmax_out = tf.truediv(posscore, tf.add(posweightscore, negscore))
+            softmax_posscore = tf.truediv(posscore, tf.add(posscore, negscore))
+            softmax_out = tf.truediv(posweightscore, tf.add(posweightscore, negscore))
             ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))),1)
             #ll = tf.Print(ll, [ll], message="my loss values:")
-            return (-ll)
+            return (-ll, softmax_posscore, w_score)
 
         def kl_gaussian(mu_1, sigma_1,debug_sigma_1, debug_sigma_2, mu_2, sigma_2):
             '''
@@ -123,15 +125,17 @@ class VAEG(VAEGConfig):
 
         def get_lossfunc(enc_mu, enc_sigma, enc_debug_sigma,prior_mu, prior_sigma, prior_debug_sigma, dec_out, w_edge):
                 kl_loss = kl_gaussian(enc_mu, enc_sigma, enc_debug_sigma,prior_debug_sigma,prior_mu, prior_sigma)  # KL_divergence loss
-                likelihood_loss = neg_loglikelihood(dec_out, w_edge)  # Cross entropy loss
+                likelihood_loss, softmax_p, weight = neg_loglikelihood(dec_out, w_edge)  # Cross entropy loss
                 self.ll = likelihood_loss
+                self.softmax_p = softmax_p
+                self.softmax_w = weight
             
                 return tf.reduce_mean(kl_loss + likelihood_loss)
 
         self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
         self.features = tf.placeholder(dtype=tf.float32, shape=[self.n, self.d], name='features')
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
-        self.indicator = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='indicator')
+        self.indicator = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n, self.bin_dim], name='indicator')
         self.weight = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='weight')
         self.weight_bin = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n, self.bin_dim], name='weight_bin')
         self.eps = tf.placeholder(dtype=tf.float32, shape=[self.n, self.z_dim, 1], name='eps')
@@ -391,7 +395,8 @@ class VAEG(VAEGConfig):
                 output dir
         '''
         num_edges = hparams.sample_edge
-        edges_seq = int(ceil(num_edges // self.n_seq))
+        edges_seq = 1
+        #int(ceil(num_edges // self.n_seq))
         list_edges = []
         for i in range(self.n):
             for j in range(i+1, self.n):
@@ -414,7 +419,7 @@ class VAEG(VAEGConfig):
         #    weight_mat[u][v]+=1
         #    weight_mat[v][u]+=1
 
-        feature, weight_bin, adj, indicator = calculate_feature(weight_mat)
+        feature, weight_bin, adj, indicator = calculate_feature(weight_mat, self.bin_dim)
         basis_matrix = basis(adj)
 
         final_state_c, final_state_h = np.zeros((1, self.h_dim)), np.zeros((1, self.h_dim))
@@ -433,14 +438,16 @@ class VAEG(VAEGConfig):
         feed_dict.update({self.initial_state_c: final_state_c})
         feed_dict.update({self.initial_state_h: final_state_h})
 
-        prob, weight, ll, final_state_c, final_state_h = self.sess.run([self.prob, self.w_edge, self.ll, self.final_state_c, self.final_state_h],feed_dict=feed_dict )
+        prob, weight, ll, final_state_c, final_state_h, softmax_p, softmax_w = self.sess.run([self.prob, self.w_edge, self.ll, self.final_state_c, self.final_state_h, self.softmax_p, self.softmax_w],feed_dict=feed_dict )
 
         
         #candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[edges_seq - 1], p=p, replace=False)]
         #seen_list.extend(candidate_edges)
         k = 0
+
         while k < num_edges:
-            list_edges, p = normalise_weighted(prob, weight, seen_list, list_edges)
+            list_edges, p = normalise_weighted(prob, weight, self.n, self.bin_dim, seen_list, list_edges, indicator)
+            #list_edges, p = normalise_weighted(prob, weight, seen_list, list_edges)
             candidate_edges = [list_edges[i] for i in np.random.choice(range(len(list_edges)), [edges_seq], p=p, replace=False)]
             seen_list.extend
 
@@ -448,7 +455,7 @@ class VAEG(VAEGConfig):
                 weight_mat[u][v] += w
                 weight_mat[v][u] += w
 
-            feature, weight_bin, adj, indicator = calculate_feature(weight_mat)
+            feature, weight_bin, adj, indicator = calculate_feature(weight_mat, self.bin_dim)
 
             basis_matrix = basis(adj)
 
@@ -474,6 +481,6 @@ class VAEG(VAEGConfig):
         
         for i in range(self.n):
            for j in range(i+1, self.n):
-               if adj[i][j] == 1:
+               if weight_mat[i][j] > 0:
                    with open(hparams.sample_file+"approach_2"+str(s_num)+".txt", "a") as fw:
-                        fw.write(str(i)+" " + str(j)+ " {}\n")
+                       fw.write(str(i)+" " + str(j)+ " {\'weight\':"+str(int(weight_mat[i][j]))+"}\n")
