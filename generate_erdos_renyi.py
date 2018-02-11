@@ -2,7 +2,7 @@ import sys
 import argparse
 import networkx as nx
 import matplotlib.pyplot as plt
-
+#from networkx.generators.tree import random_tree
 from random import choice
 
 def random_walk(G, seed, k):
@@ -19,9 +19,12 @@ def random_walk(G, seed, k):
 		
 def create_graph(n,m,p):
 	#G = nx.circular_ladder_graph(n)
-        G = nx.erdos_renyi_graph(n, p)
+        #G = nx.erdos_renyi_graph(n, p)
 	#G = nx.barabasi_albert_graph(n, m)
-        #G = nx.powerlaw_cluster_graph(n,m,p)
+        #G = random_tree(n)
+        #G = nx.random_powerlaw_tree(n, tries = 200)
+        #G = nx.star_graph(n)
+        #G = nx.balanced_tree(10,10)
         #nx.draw_networkx(G, with_labels= True)
 	print G.nodes()
         degree_sequence=list(nx.degree(G).values())
@@ -58,12 +61,11 @@ if __name__ == "__main__":
         for i in range(params.N):
             G = create_graph(params.n, params.m, params.p)
 	    A = nx.adjacency_matrix(G)
-            #print A
-            fh = open(params.file+str(i)+".edgelist" , "wb")
+            fh = open(params.file+str(i+5)+".edgelist" , "wb")
             nx.write_edgelist(G, fh)
             fh.write("\n")
 	#fh.close()
-        #fh= open("test.edgelist", "rb")
+        #fh = open("test.edgelist", "rb")
         #lines = fh.read().split('\n\n')
         #for line in lines:
         #print line
