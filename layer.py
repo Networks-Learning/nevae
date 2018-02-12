@@ -9,7 +9,7 @@ def input_layer(c_mat, adj,weight, feature, k,n,d,activation = None, batch_norm 
     output_list = []
     for i in range(k):
         if i > 0:
-            output_list.append( tf.add(tf.matmul(feature, w_in[i]),tf.matmul(tf.multiply(adj,weight), output_list[i-1])))
+            output_list.append( tf.multiply(tf.matmul(feature, w_in[i]),tf.matmul(tf.multiply(adj,weight), output_list[i-1])))
 
         else:
             output_list.append(tf.matmul(feature, w_in[i]))
