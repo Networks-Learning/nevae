@@ -1,16 +1,16 @@
 from utils import *
 from config import SAVE_DIR, VAEGConfig
-from datetime import datetime
-#from ops import print_vars
 from cell import VAEGCell
 from math import log
 import tensorflow as tf
 import numpy as np
 import logging
-import pickle
 import copy
 import os
-import random
+
+from collections import defaultdict
+from operator import itemgetter
+
 
 logging.basicConfig(format="[%(asctime)s] %(message)s", datefmt="%m%d %H:%M:%S")
 logger = logging.getLogger(__name__)
@@ -476,7 +476,163 @@ class VAEG(VAEGConfig):
             with open(hparams.sample_file+'/prob_derived.txt', 'a') as f:
                     f.write(str(-np.mean(loss_total)//10)+'\n')
 
-    
+    def get_masked_candidate(self, list_edges, prob, w_edge, num_edges):
+
+        list_edges_original = copy.copy(list_edges)
+
+        #sample 1000 times
+        count  = 0
+        structure_list = defaultdict(int)
+
+        while(count < 1000):
+            list_edges = copy.copy(list_edges_original)
+
+            indicator = np.ones([self.n, self.bin_dim])
+            p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
+            candidate_edges = [list_edges[k] for k in
+                               np.random.choice(range(len(list_edges)), [1], p=p, replace=False)]
+
+            degree = np.zeros([self.n])
+            for i1 in range(num_edges - 1):
+                (u, v, w) = candidate_edges[i1]
+                degree[u] += w
+                degree[v] += w
+
+                if degree[u] >= 5:
+                    indicator[u][0] = 0
+                if degree[u] >= 4:
+                    indicator[u][1] = 0
+                if degree[u] >= 3:
+                    indicator[u][2] = 0
+
+                if degree[v] >= 5:
+                    indicator[v][0] = 0
+                if degree[v] >= 4:
+                    indicator[v][1] = 0
+                if degree[v] >= 3:
+                    indicator[v][2] = 0
+
+                p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, candidate_edges, list_edges, indicator)
+
+                candidate_edges.extend([list_edges[k] for k in
+                                       np.random.choice(range(len(list_edges)), [1], p=p, replace=False)])
+            structure_list[sorted(candidate_edges,key=itemgetter(1))] += 1
+            count += 1
+
+        #return the element which has been sampled maximum time
+        return max(structure_list.iteritems(), key=operator.itemgetter(1))[0]
+
+    def get_unmasked_candidate(self, list_edges, prob, w_edge, num_edges):
+        # sample 1000 times
+        count = 0
+        structure_list = defaultdict(int)
+
+        while (count < 1000):
+            indicator = np.ones([self.n, self.bin_dim])
+            p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
+            candidate_edges = [list_edges[k] for k in
+                               np.random.choice(range(len(list_edges)), [num_edges], p=p, replace=False)]
+            structure_list[sorted(candidate_edges, key=itemgetter(1))] += 1
+            count += 1
+
+        # return the element which has been sampled maximum time
+        return max(structure_list.iteritems(), key=operator.itemgetter(1))[0]
+
+    def sample_graph_posterior(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node, num=10, outdir=None):
+        list_edges = get_candidate_edges(self.n)
+        eps = np.random.randn(self.n, self.z_dim, 1)
+
+        train_mu = []
+        train_sigma = []
+        hparams.sample = False
+
+        # approach 1
+        for i in range(len(adj)):
+            #list_edges_new = copy.copy(list_edges)
+            feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d,
+                                            hparams.decay_rate, placeholders)
+            feed_dict.update({self.adj: adj[i]})
+            feed_dict.update({self.features: features[i]})
+            feed_dict.update({self.weight_bin: weight_bins[i]})
+            feed_dict.update({self.weight: weights[i]})
+            feed_dict.update({self.input_data: np.zeros([self.k, self.n, self.d])})
+            feed_dict.update({self.eps: eps})
+
+            prob, ll, z_encoded, enc_mu, enc_sigma, elbo, w_edge = self.sess.run(
+                [self.prob, self.ll, self.z_encoded, self.enc_mu, self.enc_sigma, self.cost, self.w_edge],
+                feed_dict=feed_dict)
+            # prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
+            prob = np.reshape(prob, (self.n, self.n))
+
+            w_edge = np.reshape(w_edge, (self.n, self.n, self.bin_dim))
+            #indicator = np.ones([self.n, self.bin_dim])
+            #p, list_edges_new, w_new = normalise(prob, w_edge, self.n, hparams.bin_dim, [], list_edges_new, indicator)
+            if not hparams.mask_weight:
+                candidate_edges = self.get_unmasked_candidate(list_edges, prob, w_edge, hparams.edges)
+            else:
+                candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges)
+
+            for (u, v, w) in candidate_edges:
+                if (u >= 0 and v >= 0):
+                    with open(hparams.sample_file + "approach_1_train" + str(i) + "_" + str(s_num) + '.txt', 'a') as f:
+                        # print("Writing", u, v, i, s_num)
+                        f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
+
+
+    def sample_graph_neighborhood(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node, ratio, num=10, outdir=None):
+        list_edges = get_candidate_edges(self.n)
+        eps = np.random.randn(self.n, self.z_dim, 1)
+
+        train_mu = []
+        train_sigma = []
+        hparams.sample = False
+
+        # approach 1
+        for i in range(len(adj)):
+            #list_edges_new = copy.copy(list_edges)
+            feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d,
+                                            hparams.decay_rate, placeholders)
+            feed_dict.update({self.adj: adj[i]})
+            feed_dict.update({self.features: features[i]})
+            feed_dict.update({self.weight_bin: weight_bins[i]})
+            feed_dict.update({self.weight: weights[i]})
+            feed_dict.update({self.input_data: np.zeros([self.k, self.n, self.d])})
+            feed_dict.update({self.eps: eps})
+
+            prob, ll, z_encoded, enc_mu, enc_sigma, elbo, w_edge = self.sess.run(
+                [self.prob, self.ll, self.z_encoded, self.enc_mu, self.enc_sigma, self.cost, self.w_edge],
+                feed_dict=feed_dict)
+
+            hparams.sample = True
+
+            for j in range(self.n):
+                z_encoded_neighborhood = copy.copy(z_encoded)
+                z_encoded_neighborhood[j] = lerp(z_encoded[j], np.ones(len(z_encoded[node])), ratio)
+
+                feed_dict.update({self.eps:z_encoded_neighborhood})
+
+                prob, ll, z_encoded_neighborhood, enc_mu, enc_sigma, elbo, w_edge = self.sess.run(
+                [self.prob, self.ll, self.z_encoded, self.enc_mu, self.enc_sigma, self.cost, self.w_edge],
+                feed_dict=feed_dict)
+
+                # prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
+
+                prob = np.reshape(prob, (self.n, self.n))
+
+                w_edge = np.reshape(w_edge, (self.n, self.n, self.bin_dim))
+                #indicator = np.ones([self.n, self.bin_dim])
+                #p, list_edges_new, w_new = normalise(prob, w_edge, self.n, hparams.bin_dim, [], list_edges_new, indicator)
+                if not hparams.mask_weight:
+                    candidate_edges = self.get_unmasked_candidate(list_edges, prob, w_edge, hparams.edges)
+                else:
+                    candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges)
+
+                for (u, v, w) in candidate_edges:
+                    if (u >= 0 and v >= 0):
+                        with open(hparams.sample_file + "approach_1_node_" + str(j) + "_" + str(s_num) + '.txt', 'a') as f:
+                            # print("Writing", u, v, i, s_num)
+                            f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
+
     def sample_graph(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node, num=10, outdir=None):
         
         '''

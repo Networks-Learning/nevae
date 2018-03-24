@@ -50,14 +50,14 @@ def normalise(prob, weight, n, bin_dim, seen_list, list_edges, indicator):
     return combined_problist/problist.sum(), list_edges, w_rs
     #'''
     p_rs = prob/prob.sum()
-    
-    #p_rs = prob/prob.sum(axis=0)[:,None] 
+
+    #p_rs = prob/prob.sum(axis=0)[:,None]
     #p_new_rs = np.zeros([n,n,bin_dim])
     #w_rs = np.zeros([n, n, bin_dim])
     w_rs = weight
     problist = []
     negval = 0.0
-    
+
     for i in range(n):
         for j in range(i+1, n):
             if (i,j,1) in seen_list or (i,j,2) in seen_list or (i,j,3) in seen_list:
@@ -72,7 +72,7 @@ def normalise(prob, weight, n, bin_dim, seen_list, list_edges, indicator):
             #w_rs[i][j] = weight[i][j]/ sum(weight[i][j])
             #w_rs[i][j] = np.exp(weight[i][j])/ sum(np.exp(weight[i][j]))
             #p_new_rs[i][j] = p_rs[i][j] * w_rs[i][j]
-            
+
             probtemp = np.multiply(np.exp(np.minimum(p_rs[i][j]* w_rs[i][j], [10.0, 10.0, 10.0])), np.multiply(indicator[i], indicator[j]))
             #print("DEBUG proptemp", probtemp.sum())
             if probtemp.sum() > 0 :
@@ -84,12 +84,21 @@ def normalise(prob, weight, n, bin_dim, seen_list, list_edges, indicator):
     #print len(problist), negval
     #prob = np.triu(p_new_rs,1)
     #problist.append(negval)
-    
+
     problist = np.array(problist)
     #print problist, problist.sum()
     #print problist.sum()
     return problist/problist.sum(), list_edges
 
+def get_candidate_edges(n):
+    list_edges = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            # list_edges.append((i,j))
+            list_edges.append((i, j, 1))
+            list_edges.append((i, j, 2))
+            list_edges.append((i, j, 3))
+    return list_edges
 
 def slerp(p0, p1, t):
     omega = arccos(dot(p0/norm(p0), p1/norm(p1)))
