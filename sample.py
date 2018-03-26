@@ -88,9 +88,9 @@ if __name__ == '__main__':
     
     # loading the data from a file
     adj, weight, weight_bin, features, edges = load_data(hparams.graph_file, hparams.nodes, hparams.bin_dim)
-    
     #Test code
     #'''
+    
     model2 = VAEG(hparams, placeholders, hparams.nodes, 1, edges)
     model2.restore(hparams.out_dir)
     #interpolation
@@ -117,8 +117,8 @@ if __name__ == '__main__':
     '''
     #sample
     i = 0
-    while i < 100 :
-        model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i+hparams, hparams.node, (i+1) * 0.00001)
+    while i < 5 :
+        model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes, (i+1) * 0.00001)
         #model2.sample_graph(hparams, placeholders,adj, features, weight, weight_bin, i+hparams.offset, hparams.nodes, hparams.edges)
         i += 1
     

@@ -192,11 +192,11 @@ def pickle_load(path):
         loaded_pickle = pickle.load(f)
     return loaded_pickle
 
-def load_embeddings(fname):
+def load_embeddings(fname, z_dim):
     embd = []
     with open(fname) as f:
         for line in f:
-            embd.append(ast.literal_eval(line))
+            embd.append(np.array(ast.literal_eval(line)).reshape((z_dim,1)))
     return embd
 
 def load_data(filename, num=0, bin_dim=3):
@@ -213,8 +213,13 @@ def load_data(filename, num=0, bin_dim=3):
         try:
             G=nx.read_edgelist(f, nodetype=int)
         except:
-            print "Except"
-            continue
+            f = open(fname, 'r')
+            lines = f.read()
+            linesnew = lines.replace('{', '{\'weight\':').split('\n')
+            G=nx.parse_edgelist(linesnew, nodetype=int)
+
+            #print "Except"
+            #continue
         f.close()
         n = num
         for i in range(n):

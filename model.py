@@ -11,7 +11,6 @@ import os
 from collections import defaultdict
 from operator import itemgetter
 
-
 logging.basicConfig(format="[%(asctime)s] %(message)s", datefmt="%m%d %H:%M:%S")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -37,7 +36,7 @@ class VAEG(VAEGConfig):
         def masked_ll(weight_temp, weight_negative, posscore, posweightscore, temp_pos_score, temp ):
                 
                 degree = np.zeros([self.n], dtype=np.float32)
-                indicator = np.ones([self.n, 3], dtype=np.float32)
+                indicator = np.ones([self.n, self.bin_dim], dtype=np.float32)
                 ll = 0.0
                 for (u, v, w) in self.edges[self.count]:
                     degree[u] += w
@@ -55,8 +54,6 @@ class VAEG(VAEGConfig):
                     currentscore = modified_posscore_weighted * 1.0 / (temp_pos_score + temp) 
                     ll += tf.log(currentscore + 1e-9)
 
-                    
-                
                     #indicator = np.ones([3], dtype = np.float32)    
                     if degree[u] >=5 :
                         indicator[u][0] = 0
@@ -396,19 +393,25 @@ class VAEG(VAEGConfig):
                     
                     #wscore_u_v = tf.reduce_sum(tf.multiply(indicator, weight_temp[u][v]))
                     #poscore_weighted_u_v = wscore_u_v * posscore[u][v]
-                    if degree[u] >=5 :
-                        indicator[u][0] = 0
+                    #if degree[u] >=5 :
+                    #    indicator[u][0] = 0
                     if degree[u] >=4  :
+                        indicator[u][0] = 0
                         indicator[u][1] = 0
+
                     if degree[u] >=3  :
+                        indicator[u][1] = 0
                         indicator[u][2] = 0
 
-                    if degree[v] >=5 :
-                        indicator[v][0] = 0
+                    #if degree[v] >=5 :
+                    #    indicator[v][0] = 0
                     if degree[v] >=4  :
+                        indicator[v][0] = 0
                         indicator[v][1] = 0
                     if degree[v] >=3  :
+                        indicator[v][1] = 0        
                         indicator[v][2] = 0
+                
                     
                     #print("Debug indicator before", indicator, w_edge[u][v])
                     #w_edge[u][v] = np.exp(w_edge[u][v])/sum(np.exp(w_edge[u][v]))
@@ -498,29 +501,34 @@ class VAEG(VAEGConfig):
                 degree[u] += w
                 degree[v] += w
 
-                if degree[u] >= 5:
-                    indicator[u][0] = 0
+                #if degree[u] >= 5:
+                #    indicator[u][0] = 0
                 if degree[u] >= 4:
                     indicator[u][1] = 0
+                    indicator[u][0] = 0
                 if degree[u] >= 3:
+                    indicator[u][1] = 0
                     indicator[u][2] = 0
 
-                if degree[v] >= 5:
-                    indicator[v][0] = 0
+                #if degree[v] >= 5:
+                #    indicator[v][0] = 0
                 if degree[v] >= 4:
+                    indicator[v][0] = 0
                     indicator[v][1] = 0
                 if degree[v] >= 3:
+                    indicator[v][1] = 0
                     indicator[v][2] = 0
 
                 p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, candidate_edges, list_edges, indicator)
 
                 candidate_edges.extend([list_edges[k] for k in
                                        np.random.choice(range(len(list_edges)), [1], p=p, replace=False)])
-            structure_list[sorted(candidate_edges,key=itemgetter(1))] += 1
+            structure_list[' '.join([str(u)+ '-'+str(v)+'-'+str(w) for (u,v,w) in sorted(candidate_edges)])] += 1
             count += 1
 
         #return the element which has been sampled maximum time
-        return max(structure_list.iteritems(), key=operator.itemgetter(1))[0]
+        print("Debug structure", structure_list)
+        return max(structure_list.iteritems(), key=itemgetter(1))[0]
 
     def get_unmasked_candidate(self, list_edges, prob, w_edge, num_edges):
         # sample 1000 times
@@ -532,7 +540,9 @@ class VAEG(VAEGConfig):
             p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
             candidate_edges = [list_edges[k] for k in
                                np.random.choice(range(len(list_edges)), [num_edges], p=p, replace=False)]
-            structure_list[sorted(candidate_edges, key=itemgetter(1))] += 1
+            structure_list[' '.join([str(u)+ '-'+str(v)+'-'+str(w) for (u,v,w) in sorted(candidate_edges,key=itemgetter(0))])] += 1
+
+            #structure_list[sorted(candidate_edges, key=itemgetter(1))] += 1
             count += 1
 
         # return the element which has been sampled maximum time
@@ -581,7 +591,9 @@ class VAEG(VAEGConfig):
 
     def sample_graph_neighborhood(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node, ratio, num=10, outdir=None):
         list_edges = get_candidate_edges(self.n)
-        eps = np.random.randn(self.n, self.z_dim, 1)
+
+        eps = load_embeddings(hparams.z_dir+'encoded_input0'+'.txt', hparams.z_dim)
+        #eps = np.random.randn(self.n, self.z_dim, 1)
 
         train_mu = []
         train_sigma = []
@@ -598,19 +610,32 @@ class VAEG(VAEGConfig):
             feed_dict.update({self.weight: weights[i]})
             feed_dict.update({self.input_data: np.zeros([self.k, self.n, self.d])})
             feed_dict.update({self.eps: eps})
-
+            hparams.sample = False
             prob, ll, z_encoded, enc_mu, enc_sigma, elbo, w_edge = self.sess.run(
                 [self.prob, self.ll, self.z_encoded, self.enc_mu, self.enc_sigma, self.cost, self.w_edge],
                 feed_dict=feed_dict)
 
+            '''
+            with open(hparams.z_dir+'encoded_input'+str(i)+'.txt', 'a') as f:
+                for z_i in z_encoded:
+                    f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
+                f.write("\n")
+            '''
+            
             hparams.sample = True
 
             for j in range(self.n):
                 z_encoded_neighborhood = copy.copy(z_encoded)
-                z_encoded_neighborhood[j] = lerp(z_encoded[j], np.ones(len(z_encoded[node])), ratio)
+                #print("Debug size", z_encoded.shape, z_encoded[0].shape)
+                z_encoded_neighborhood[j] = lerp(z_encoded[j], np.ones(z_encoded[j].shape), ratio)
+                with open(hparams.z_dir+'interpolated_input1'+str(i)+'.txt', 'a') as f:
+                    for z_i in z_encoded_neighborhood:
+                        f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
+
+                    f.write("\n")
 
                 feed_dict.update({self.eps:z_encoded_neighborhood})
-
+                
                 prob, ll, z_encoded_neighborhood, enc_mu, enc_sigma, elbo, w_edge = self.sess.run(
                 [self.prob, self.ll, self.z_encoded, self.enc_mu, self.enc_sigma, self.cost, self.w_edge],
                 feed_dict=feed_dict)
@@ -627,11 +652,17 @@ class VAEG(VAEGConfig):
                 else:
                     candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges)
 
-                for (u, v, w) in candidate_edges:
+                #for (u, v, w) in candidate_edges:
+                for uvw in candidate_edges.split():
+                    [u,v,w] = uvw.split("-")
+                    u = int(u)
+                    v = int(v)
+                    w = int(w)
                     if (u >= 0 and v >= 0):
                         with open(hparams.sample_file + "approach_1_node_" + str(j) + "_" + str(s_num) + '.txt', 'a') as f:
                             # print("Writing", u, v, i, s_num)
                             f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
+                #break
 
     def sample_graph(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node, num=10, outdir=None):
         

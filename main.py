@@ -36,7 +36,7 @@ def add_arguments(parser):
     parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
     parser.add_argument("--z_dim", type=int, default=5, help="z_dim")
     parser.add_argument("--nodes", type=int, default=5, help="z_dim")
-    parser.add_argument("--bin_dim", type=int, default=5, help="bin_dim")
+    parser.add_argument("--bin_dim", type=int, default=3, help="bin_dim")
 
     parser.add_argument("--graph_file", type=str, default=None,
                         help="The dictory where the training graph structure is saved")

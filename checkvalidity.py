@@ -9,7 +9,7 @@ from rdkit.Chem import Draw
 from rdkit.Chem import AllChem
 from rdkit.Chem import Draw, Lipinski
 from rdkit.Chem import Descriptors
-import sascorer
+#import sascorer
 
 def getValenceDict(filename):
     f = open(filename)
@@ -27,8 +27,8 @@ def getAtom(valency):
     if valency == 1:
         atom = 'H'
     if valency == 5:
-        #atom = 'S'
-        atom = 'N'
+        atom = 'S'
+        #atom = 'N'
     return atom
 
 def guess_correct_molecules(readfile, writefile, n, multi):
@@ -119,7 +119,6 @@ def drawchem(mols):
         Draw.MolToFile(mol,sys.argv[5]+tokens+'.pdf')
 
         count += 1 
-
 def calculate_property(m):
     SA_score = -sascorer.calculateScore(m)
     MW = Descriptors.MolWt(m)
@@ -146,11 +145,13 @@ if __name__=="__main__":
             m1 = Chem.MolFromMol2File(sys.argv[2])
             if m1 != None:
                 s = Chem.MolToSmiles(m1)
-                sa, mw, rb, logp = calculate_property(m1)
+                #sa, mw, rb, logp = calculate_property(m1)
                 smiles.append(s)
-                with open(sys.argv[5]+'properties.txt', 'a') as f:
-                    f.write(readfile + " "+str(sa)+" "+str(mw)+ " "+str(rb)+ " "+ str(logp)+"\n")
-                mols.append((m1, readfile, sa, mw, rb, logp))
+                #with open(sys.argv[5]+'properties.txt', 'a') as f:
+                #    f.write(readfile + " "+str(sa)+" "+str(mw)+ " "+str(rb)+ " "+ str(logp)+"\n")
+                mols.append((m1, readfile))
+                #, sa, mw, rb, logp))
+                #mols.append(m1)
                 valid += 1
     print "Valid:", valid, "Total:", total, "moltotal:",moltotal, "Perc:", valid/total
     drawchem(mols)

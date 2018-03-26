@@ -76,11 +76,21 @@ class VAEGCell(object):
  
 	    with tf.variable_scope("Decoder"):
                 z_stack = []
+                z_stack_weight = []
                 for u in range(n):
                     for v in range(n):
                         z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis = 1)[0])
-		dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
-                weight = fc_layer(tf.stack(z_stack), self.bin_dim, activation=tf.nn.softplus, scope = "marker")
+                        #m = np.zeros((1, self.bin_dim))
+                        for j in range(self.bin_dim):
+                            #z_stack_weight.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v]),[[j+1]]), axis = 1)[0])
+		            #'''
+                            m = np.zeros((1, self.bin_dim))
+                            m[0][j] = 1
+                            z_stack_weight.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v]),m), axis = 1)[0])
+                            #'''
+
+                dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
+                weight = fc_layer(tf.stack(z_stack_weight), 1, activation=tf.nn.softplus, scope = "marker")
         return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma, z, weight)
 
     def call(self,inputs,n,d,k,eps_passed, sample):
