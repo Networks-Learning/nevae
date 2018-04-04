@@ -8,12 +8,74 @@ import ast
 import scipy
 from numpy.linalg import svd, qr, norm
 import glob
+from collections import defaultdict
+from math import log
 
+def change(p, w, hnodes, nodes, bin_dim, degree, indicator):
+    p_matrix = np.zeros((nodes - len(hnodes), nodes - len(hnodes)))
+    w_matrix = np.zeros((nodes - len(hnodes), nodes - len(hnodes), bin_dim))
+    
+    indicator_new = np.zeros((nodes - len(hnodes), bin_dim))
+    
+    degree_new = np.zeros(nodes - len(hnodes))
+    rest = list(set(range(nodes)) - set(hnodes)) 
+    print("Debig dim", rest, len(rest), p_matrix.shape)
+    k = 0
+    for i in rest:
+        l = 0
+        degree_new[k] = degree[i]
+        indicator_new[k] = indicator[i]
+        for j in rest:
+                p_matrix[k][l] = p[i][j]
+                w_matrix[k][l] = w[i][j]
+                #indicator_new[k][l] = indicator[i][j]
+                l += 1
+        k += 1 
+    return (p_matrix, w_matrix, degree_new, indicator_new)        
 
+def normalise_h(prob, weight, hnodes, bin_dim , indicator, edge_mask, indexlist):
+    
+    n = len(prob[0])
+    temp = np.ones([n, n])
+    p_rs = np.exp(np.minimum(np.multiply(prob, edge_mask), 10 * temp))
+    
+    temp = np.ones([n, n, bin_dim])
+    w_rs = np.exp(np.minimum(weight, 10* temp))
+    combined_problist = []
+   
+    problist = []
+    for i in indexlist:
+        for j in range(i+1, n):
+            problist.append(p_rs[i][j])
+            indi = np.multiply(indicator[i], indicator[j])
+            denom = sum(np.multiply(w_rs[i][j], indi))
+            if denom == 0:
+                denom = 1
+                del problist[-1]
+            w_rs[i][j] = np.multiply(w_rs[i][j], indi)/ denom
+            combined_problist.extend(p_rs[i][j]*w_rs[i][j])
+    problist = np.array(problist)
+    
+    return combined_problist/problist.sum()
+
+def checkcycle(edge, G=None):
+    if G == None:
+        G=nx.Graph()
+    (u, v, w) = edge
+    G.add_edge(u, v, weight=w)
+    #return (G, len(list(nx.simple_cycles(G))))
+    return (G, len(nx.cycle_basis(G)))
+
+def log_fact(k):
+    dict_ = defaultdict(float)
+    for i in range(k):
+        dict_[i+1] = dict_[i] + log(i+1)
+    return dict_ 
 
 def normalise(prob, weight, n, bin_dim, seen_list, list_edges, indicator):
     #'''
     #print "Debug", np.minimum(prob, np.zeros([n, n]).fill(10.0))
+    n = len(prob[0])
     temp = np.ones([n, n])
     #print "Debug temp", temp
     #temp.fill(10.0)
@@ -98,6 +160,16 @@ def get_candidate_edges(n):
             list_edges.append((i, j, 1))
             list_edges.append((i, j, 2))
             list_edges.append((i, j, 3))
+    return list_edges
+
+def get_candidate_neighbor_edges(index, n):
+    list_edges = []
+    for j in range(index + 1, n):
+            # list_edges.append((i,j))
+            list_edges.append((index, j, 1))
+            list_edges.append((index, j, 2))
+            list_edges.append((index, j, 3))
+    
     return list_edges
 
 def slerp(p0, p1, t):
@@ -206,6 +278,7 @@ def load_data(filename, num=0, bin_dim=3):
     weightlist = []
     weight_binlist = []
     edgelist = []
+    hdelist = []
     filenumber = int(len(glob.glob(path)) * 1)
     
     for fname in sorted(glob.glob(path))[:filenumber]:
@@ -226,10 +299,13 @@ def load_data(filename, num=0, bin_dim=3):
             if i not in G.nodes():
                 G.add_node(i)
         degreemat = np.zeros((n,1), dtype=np.float)
+        count = np.zeros(5)
 
         for u in G.nodes():
             degreemat[int(u)][0] = (G.degree(u)*1.0)/(n-1)
-
+            count[G.degree(u)] += 1
+        hde = (2 * count[4] + 2 + count[3] - count[1]) / 2
+        hdelist.append(hde)
         try:
             weight = np.array(nx.adjacency_matrix(G).todense())
             adj = np.zeros([n,n])
@@ -249,7 +325,7 @@ def load_data(filename, num=0, bin_dim=3):
             edgelist.append(edges)
         except:
             continue
-    return (adjlist, weightlist, weight_binlist, featurelist, edgelist)
+    return (adjlist, weightlist, weight_binlist, featurelist, edgelist, hdelist)
 
 def pickle_save(content, path):
     '''Save the content on the path'''

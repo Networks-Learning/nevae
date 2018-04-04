@@ -34,7 +34,10 @@ def getAtom(valency):
 def guess_correct_molecules(readfile, writefile, n, multi):
     
     f = open(readfile)
-    G=nx.read_edgelist(f, nodetype=int)
+    try:
+        G=nx.read_edgelist(f, nodetype=int)
+    except:
+        return False
     nodes = len(G.nodes())
     count = 1 
     index = defaultdict(int)
@@ -52,7 +55,7 @@ def guess_correct_molecules(readfile, writefile, n, multi):
         deg.append(np.sum(adj[i]))
     
     deg = np.array(deg)
-    #print "debug", deg
+    print "debug", deg
     maxdeg = deg.max()
     #if maxdeg >= 6:
     #    return False
@@ -139,17 +142,18 @@ if __name__=="__main__":
 
     for readfile in sorted(glob.glob(readfileDir)):
         moltotal +=1
-
+        print readfile
         if guess_correct_molecules(readfile, writefile, int(sys.argv[3]), int(sys.argv[4])):
             total += 1
             m1 = Chem.MolFromMol2File(sys.argv[2])
             if m1 != None:
                 s = Chem.MolToSmiles(m1)
+                m2 = Chem.AddHs(m1)
                 #sa, mw, rb, logp = calculate_property(m1)
                 smiles.append(s)
                 #with open(sys.argv[5]+'properties.txt', 'a') as f:
                 #    f.write(readfile + " "+str(sa)+" "+str(mw)+ " "+str(rb)+ " "+ str(logp)+"\n")
-                mols.append((m1, readfile))
+                mols.append((m2, readfile))
                 #, sa, mw, rb, logp))
                 #mols.append(m1)
                 valid += 1

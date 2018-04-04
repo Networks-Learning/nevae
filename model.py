@@ -15,9 +15,8 @@ logging.basicConfig(format="[%(asctime)s] %(message)s", datefmt="%m%d %H:%M:%S")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-
 class VAEG(VAEGConfig):
-    def __init__(self, hparams, placeholders, num_nodes, num_features, edges, istest=False):
+    def __init__(self, hparams, placeholders, num_nodes, num_features, edges, log_fact_k, hde, istest=False):
         self.features_dim = num_features
         self.input_dim = num_nodes
         self.dropout = placeholders['dropout']
@@ -31,43 +30,88 @@ class VAEG(VAEGConfig):
         self.edges = edges
         self.count = 0
         self.mask_weight = hparams.mask_weight
+        self.log_fact_k = log_fact_k
+        self.hde = hde
 
         # For masking we calculated the likelihood like this
         def masked_ll(weight_temp, weight_negative, posscore, posweightscore, temp_pos_score, temp ):
                 
                 degree = np.zeros([self.n], dtype=np.float32)
                 indicator = np.ones([self.n, self.bin_dim], dtype=np.float32)
+                indicator_bridge = np.ones([self.n, self.n], dtype=np.float32)
+                #ring_indicator = np.ones([self.n])
                 ll = 0.0
-                for (u, v, w) in self.edges[self.count]:
+                adj = np.zeros([self.n, self.n], dtype=np.float32)
+
+                #for (u, v, w) in self.edges[self.count]:
+                for i in range(len(self.edges[self.count])):
+                    
+                    (u, v, w) = self.edges[self.count][i]
+                    
                     degree[u] += w
                     degree[v] += w
                     
                     modified_weight = tf.reduce_sum(tf.multiply(np.multiply(indicator[u],indicator[v]), weight_temp[u][v])) / weight_negative[u][v]
-                    modified_posscore_weighted = modified_weight * posscore[u][v] * 1.0  
+                    modified_posscore_weighted = modified_weight * posscore[u][v] * indicator_bridge[u][v] * 1.0  
 
                     currentscore = modified_posscore_weighted * 1.0 / (temp_pos_score + temp) 
                     ll += tf.log(currentscore + 1e-9)
                     
                     modified_weight = tf.reduce_sum(tf.multiply(np.multiply(indicator[v],indicator[u]), weight_temp[v][u])) / weight_negative[v][u]
-                    modified_posscore_weighted = modified_weight * posscore[v][u] * 1.0  
+                    modified_posscore_weighted = modified_weight * posscore[v][u] * indicator_bridge[v][u] * 1.0  
 
                     currentscore = modified_posscore_weighted * 1.0 / (temp_pos_score + temp) 
                     ll += tf.log(currentscore + 1e-9)
 
                     #indicator = np.ones([3], dtype = np.float32)    
-                    if degree[u] >=5 :
-                        indicator[u][0] = 0
+                    
+                    #if degree[u] >=5 :
+                    #    indicator[u][0] = 0
+                    
                     if degree[u] >=4  :
+                        indicator[u][0] = 0
                         indicator[u][1] = 0
                     if degree[u] >=3  :
+                        indicator[u][1] = 0
                         indicator[u][2] = 0
                         
-                    if degree[v] >=5 :
-                        indicator[v][0] = 0
+                    #if degree[v] >=5 :
+                    #    indicator[v][0] = 0
+                    
                     if degree[v] >=4  :
+                        indicator[v][0] = 0
                         indicator[v][1] = 0
                     if degree[v] >=3  :
+                        indicator[v][1] = 0
                         indicator[v][2] = 0
+
+                    # From the next there will be no double bond, ensures there will be alternating bonds
+                    # there will ne bo bridge
+                    if w == 2 :
+                        indicator[u][1] = 0
+                        indicator[v][1] = 0
+                    # if a double or triple bond has occurs there will be no bridge head
+                    if w >=2 :
+                        for j in range(i) :
+                            
+                            (u1, v1, w1)  = self.edges[self.count][j]
+                            
+                            if u == u1:
+                                indicator_bridge[v][v1] = 0
+                                indicator_bridge[v1][v] = 0
+
+                            if u == v1:
+                                indicator_bridge[v][u1] = 0
+                                indicator_bridge[u1][v] = 0
+
+                            if v == u1:
+                                indicator_bridge[u][v1] = 0
+                                indicator_bridge[v1][u] = 0
+
+                            if v == v1:
+                                indicator_bridge[u][u1] = 0
+                                indicator_bridge[u1][u] = 0
+                    
                     #If we don't want negative sampling we can uncomment the following
                     '''
                     for i in range(self.n): 
@@ -141,11 +185,11 @@ class VAEG(VAEGConfig):
                 posweightscore = tf.Print(posweightscore, [posweightscore], message="my weighted posscore")
 
                 softmax_out = tf.truediv(posweightscore, tf.add(posweightscore, negscore))
+
                 if self.mask_weight:
                     ll = masked_ll(weight_temp, weight_negative, posscore, posweightscore, temp_pos_score, temp)
-                
                 else:
-                    ll= tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))),1)
+                    ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))),1)
             
             return (-ll)
 
@@ -180,13 +224,22 @@ class VAEG(VAEGConfig):
                 #print "debug KL", first_term.shape, second_term.shape, k.shape, third_term.shape, sigma_1[0].shape
                 #return 0.5 *tf.reduce_sum((
                 return 0.5 * tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)
-        
+       
+        def ll_poisson(lambda_, x):
+            return -(x * np.log(lambda_) - lambda_ * np.log(2.72) - self.log_fact_k[x-1])
+            
 	def get_lossfunc(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma, dec_out, w_edge):
             kl_loss = kl_gaussian(enc_mu, enc_sigma, debug_sigma,prior_mu, prior_sigma)  # KL_divergence loss
             likelihood_loss = neg_loglikelihood(dec_out, w_edge)  # Cross entropy loss
             self.ll = likelihood_loss
             self.kl = kl_loss
-            return tf.reduce_mean(kl_loss + likelihood_loss)
+            lambda_e = 31
+            lambda_n = 30
+            lambda_hde = 5
+            edgeprob = ll_poisson(lambda_e, len(self.edges[self.count]))
+            nodeprob = ll_poisson(lambda_n, self.n)
+            hde = ll_poisson(lambda_hde, self.hde[self.count])
+            return tf.reduce_mean(kl_loss + likelihood_loss) + edgeprob + nodeprob + hde
 
 
         self.adj = tf.placeholder(dtype=tf.float32, shape=[self.n, self.n], name='adj')
@@ -479,50 +532,289 @@ class VAEG(VAEGConfig):
             with open(hparams.sample_file+'/prob_derived.txt', 'a') as f:
                     f.write(str(-np.mean(loss_total)//10)+'\n')
 
-    def get_masked_candidate(self, list_edges, prob, w_edge, num_edges):
+    def get_masked_candidate_with_atom_ratio_new(self, prob, w_edge, atom_count, num_edges, hde):
+        
+        rest = range(self.n)
+        hn = np.random.choice(rest, atom_count[0], replace=False)
+        rest = list(set(rest) - set(hn))
+        on = np.random.choice(rest, atom_count[1], replace=False)
+        rest = list(set(rest) - set(on))
+        nn = np.random.choice(rest, atom_count[2], replace=False)
+        rest = list(set(rest) - set(nn))
+        cn = np.random.choice(rest, atom_count[3], replace=False)
+
+        #print("Debug hnodes:",hnodes) 
+        indicator = np.ones([self.n, self.bin_dim])
+        edge_mask = np.ones([self.n, self.n])
+        degree = np.zeros(self.n)
+         
+        list_edges = []
+        candidate_nodes = []
+        nodelist = hn
+        
+        for node in hn:
+            indicator[node][1] = 0
+            indicator[node][2] = 0
+        for node in on:
+            indicator[node][2] = 0
+
+        nodelist = []
+        list_edges = get_candidate_edges(self.n)
+        p, le, w = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
+ 
+        #p = normalise(prob, w_edge, hnodes, indicator, nodelist)
+                
+        candidate_edges = [list_edges[k] for k in
+                               np.random.choice(range(len(list_edges)), [1], p=p, replace=False)]
+        list_edges = []
+        #list_edges.append(candidate_edges[0])
+
+        for i1 in range(num_edges-1):
+                (u, v, w) = candidate_edges[i1]
+                degree[u] += w
+                degree[v] += w
+
+                edge_mask[u][v] = 0
+                edge_mask[v][u] = 0
+                
+                # degree condition nitrogen
+                if u in nn and degree[u] == 3:
+                    indicator[u][0] = 0
+
+                if v in nn and degree[v] == 3:
+                    indicator[v][0] = 0
+                
+                if u in on and degree[u] == 2:
+                    indicator[u][0] = 0
+                    indicator[u][1] = 0
+
+                if v in on and degree[v] == 2:
+                    indicator[v][0] = 0
+                    indicator[v][1] = 0
+
+                if degree[u] >= 4:
+                    indicator[u][0] = 0
+                    indicator[u][1] = 0
+                    indicator[u][2] = 0
+            
+                if degree[v] >= 4:
+                    indicator[v][0] = 0
+                    indicator[v][1] = 0
+                    indicator[v][2] = 0
+                
+                if u not in nodelist:
+                    nodelist.append(u)
+                    list_edges.extend(get_candidate_neighbor_edges(u, self.n))
+                if v not in nodelist:
+                    nodelist.append(v)
+                    list_edges.extend(get_candidate_neighbor_edges(v, self.n))
+                
+                p = normalise_h(prob, w_edge, hn, self.bin_dim, indicator, edge_mask, nodelist)
+                print("DEBUG P size", len(p), len(list_edges), nodelist, list_edges) 
+                candidate_edges.extend([list_edges[k] for k in
+                               np.random.choice(range(len(list_edges)), [1], p=p, replace=False)])
+        
+        candidate_edges_new = ''
+        for (u,v,w) in candidate_edges:
+            if u < v:
+                candidate_edges_new += ' '+str(u)+'-'+str(v)+'-'+str(w)
+            else:
+                candidate_edges_new += ' '+str(v)+'-'+str(u)+'-'+str(w)
+        return candidate_edges_new
+
+    def get_masked_candidate_with_atom_ratio(self, prob, w_edge, hcount, num_edges, hde):
+        
+        
+        hnodes = np.random.choice(range(self.n), hcount, replace=False)
+        indicator = np.ones(self.n)
+
+        print("Debug hnodes:",hnodes) 
+        indicator_overall = np.ones([self.n, self.bin_dim])
+        degree = np.zeros(self.n)
+        list_edges = []
+        
+        #p = normalise_h(prob, w_edge, hnodes, indicator, hnodes[0])
+
+        candidate_nodes = []
+        #[k for k in np.random.choice(range(self.n), [1], p=p, replace=False)]
+         
+        for i1 in range(hcount):
+                p, list_index = normalise_h(prob, w_edge, hnodes, indicator, hnodes[i1])
+                #candidate_nodes.extend([k for k in
+                #               np.random.choice(range(self.n), [1], p=p, replace=False)])
+                candidate_nodes.extend([k for k in
+                               np.random.choice(list_index, [1], p=p, replace=False)])
+
+                
+                u = candidate_nodes[i1]
+                v = hnodes[i1]
+                w = 1
+
+                degree[u] += w
+                degree[v] += w
+
+                if degree[u] >= 4:
+                    indicator[u] = 0
+                    indicator_overall[u][0] = 0
+                
+                if degree[u] >= 3:
+                    indicator_overall[u][1] = 0
+                    indicator_overall[u][2] = 0
+
+                # we don't want any edge to this leaf node to come any time
+                indicator_overall[v][0] = 0
+                indicator_overall[v][1] = 0
+                indicator_overall[v][2] = 0
+
+                #p = normalise_h(prob, w_edge, hnodes, indicator, hnodes[i1+1])
+                #p, list_edges, w = normalise_h(prob, w_edge, hnodes, indicator, candidate_edges, list_edges, hnodes[i1])
+                #candidate_nodes.extend([k for k in
+                #               np.random.choice(range(self.n), [1], p=p, replace=False)])
+                #candidate_edges.extend([list_edges[k] for k in
+                #                       np.random.choice(range(len(list_edges)), [1], p=p, replace=False)])
+        
+        print("Debug degree before", degree)
+        print("Debug candiate nodes ", candidate_nodes)
+        
+        candidate_edges_new = ''
+        for el in range(len(hnodes)):
+            u = hnodes[el]
+            v = candidate_nodes[el]
+            w = 1
+            if u < v:
+                candidate_edges_new += ' '+str(u)+'-'+str(v)+'-'+str(w)
+            else:
+                candidate_edges_new += ' '+str(v)+'-'+str(u)+'-'+str(w)
+
+        #prob, w_edge, degree, indicator_overall = change(prob, w_edge, hnodes, self.n, self.bin_dim, degree, indicator_overall)
+        #list_edges = get_candidate_edges(self.n - hcount)
+        
+        list_edges = get_candidate_edges(self.n)
+        print("Debug degree after", degree)
+
+        #candidate_edges_new = ' '.join([str(u)+ '-'+str(v)+'-'+str(w) for (u,v,w) in sorted(candidate_edges)])
+        
+        candidate_edges_rest = self.get_masked_candidate(list_edges, prob, w_edge, num_edges - hcount, hde, indicator_overall, degree)
+        
+        #rest = list(set(range(self.n)) - set(hnodes))
+        #print("Debug_rest", rest)
+        candidate_edges_new += ' '+candidate_edges_rest
+        '''
+        for uvw in candidate_edges_rest.strip().split():
+                    [u,v,w] = uvw.split("-")
+                    u = rest[int(u)]
+                    v = rest[int(v)]
+                    w = rest[int(w)]
+                    candidate_edges_new += ' '+str(u)+'-'+str(v)+'-'+str(w)
+        '''
+        print("Candidate_new", candidate_edges_new)
+        return candidate_edges_new.strip()
+    
+    def get_masked_candidate(self, list_edges, prob, w_edge, num_edges, hde, indicator=[], degree=[]):
 
         list_edges_original = copy.copy(list_edges)
-
+        n = len(prob[0])
         #sample 1000 times
         count  = 0
         structure_list = defaultdict(int)
 
-        while(count < 1000):
+        #while(count < 50):
+        while (count < 1):
+            applyrules = False
             list_edges = copy.copy(list_edges_original)
+            if len(indicator) == 0 :
+                print("Debug indi new assign")
+                indicator = np.ones([self.n, self.bin_dim])
+            reach = np.ones([n, n])
 
-            indicator = np.ones([self.n, self.bin_dim])
             p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
             candidate_edges = [list_edges[k] for k in
                                np.random.choice(range(len(list_edges)), [1], p=p, replace=False)]
-
-            degree = np.zeros([self.n])
+            #if degree == None:
+            if len(degree) == 0:
+                print("Debug degree new assign")
+                degree = np.zeros([self.n])
+            G = None
+            saturation = 0
+            
             for i1 in range(num_edges - 1):
                 (u, v, w) = candidate_edges[i1]
+                for j in range(n):
+                    
+                    if reach[u][j] == 0:
+                        reach[v][j] = 0
+                        reach[j][v] = 0
+                    if reach[v][j] == 0:
+                        reach[u][j] = 0
+                        reach[j][u] = 0
+                
+                reach[u][v] = 0
+                reach[v][u] = 0
+
                 degree[u] += w
                 degree[v] += w
 
                 #if degree[u] >= 5:
                 #    indicator[u][0] = 0
                 if degree[u] >= 4:
-                    indicator[u][1] = 0
                     indicator[u][0] = 0
                 if degree[u] >= 3:
                     indicator[u][1] = 0
+                if degree[u] >=2:
                     indicator[u][2] = 0
 
                 #if degree[v] >= 5:
                 #    indicator[v][0] = 0
                 if degree[v] >= 4:
                     indicator[v][0] = 0
-                    indicator[v][1] = 0
                 if degree[v] >= 3:
                     indicator[v][1] = 0
+                if degree[v] >= 2:
                     indicator[v][2] = 0
-
+                # there will ne bo bridge
+                '''
+                if w == 2:
+                        indicator[u][1] = 0
+                        indicator[v][1] = 0
+            
+                # if a double or triple bond has occurs there will be no bridge head
+                if w >=2:
+                        saturation += 1
+                        for j in range(i1):
+                            (u1, v1, w1)  = candidate_edges[i1]
+                            if u == u1:
+                                prob[v][v1] = 0
+                                prob[v1][v] = 0
+                            if u == v1:
+                                prob[v][u1] = 0
+                                prob[u1][v] = 0
+                            if v == u1:
+                                prob[u][v1] = 0
+                                prob[v1][u] = 0
+                            if v == v1:
+                                prob[u][u1] = 0
+                                prob[u1][u] = 0
+                #cycles = checkcycle(candidate_edges)
+                (G , cycle) = checkcycle(candidate_edges[i1], G) 
+                saturation += cycle
+                
+                if saturation == hde and applyrules==False:
+                    for i in range(n):
+                        indicator[i][1] = 0
+                        indicator[i][2] = 0
+                    #change the cycle generation probability
+                    prob = np.multiply(reach, prob)
+                    applyrules = True
+                '''
                 p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, candidate_edges, list_edges, indicator)
 
-                candidate_edges.extend([list_edges[k] for k in
+                #print("Debug p", p, i1)
+                try:
+                    candidate_edges.extend([list_edges[k] for k in
                                        np.random.choice(range(len(list_edges)), [1], p=p, replace=False)])
+                except:
+                    #candidate_edges = []
+                    continue
             structure_list[' '.join([str(u)+ '-'+str(v)+'-'+str(w) for (u,v,w) in sorted(candidate_edges)])] += 1
             count += 1
 
@@ -535,7 +827,8 @@ class VAEG(VAEGConfig):
         count = 0
         structure_list = defaultdict(int)
 
-        while (count < 1000):
+        #while (count < 1000):
+        while (count < 50):
             indicator = np.ones([self.n, self.bin_dim])
             p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
             candidate_edges = [list_edges[k] for k in
@@ -546,9 +839,9 @@ class VAEG(VAEGConfig):
             count += 1
 
         # return the element which has been sampled maximum time
-        return max(structure_list.iteritems(), key=operator.itemgetter(1))[0]
+        return max(structure_list.iteritems(), key=itemgetter(1))[0]
 
-    def sample_graph_posterior(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node, num=10, outdir=None):
+    def sample_graph_posterior(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node,  num=10, outdir=None):
         list_edges = get_candidate_edges(self.n)
         eps = np.random.randn(self.n, self.z_dim, 1)
 
@@ -580,20 +873,31 @@ class VAEG(VAEGConfig):
             if not hparams.mask_weight:
                 candidate_edges = self.get_unmasked_candidate(list_edges, prob, w_edge, hparams.edges)
             else:
-                candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges)
+                candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges, hde)
+            '''
 
             for (u, v, w) in candidate_edges:
                 if (u >= 0 and v >= 0):
                     with open(hparams.sample_file + "approach_1_train" + str(i) + "_" + str(s_num) + '.txt', 'a') as f:
                         # print("Writing", u, v, i, s_num)
                         f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
+            '''
+            for uvw in candidate_edges.split():
+                    [u,v,w] = uvw.split("-")
+                    u = int(u)
+                    v = int(v)
+                    w = int(w)
+                    if (u >= 0 and v >= 0):
+                        with open(hparams.sample_file + "approach_1" + "_" + str(s_num) + '.txt', 'a') as f:
+                            # print("Writing", u, v, i, s_num)
+                            f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
 
 
-    def sample_graph_neighborhood(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node, ratio, num=10, outdir=None):
+    def sample_graph_neighborhood(self, hparams,placeholders, adj, features, weights, weight_bins, s_num, node, ratio, hde, num=10, outdir=None):
         list_edges = get_candidate_edges(self.n)
 
-        eps = load_embeddings(hparams.z_dir+'encoded_input0'+'.txt', hparams.z_dim)
-        #eps = np.random.randn(self.n, self.z_dim, 1)
+        #eps = load_embeddings(hparams.z_dir+'encoded_input0'+'.txt', hparams.z_dim)
+        eps = np.random.randn(self.n, self.z_dim, 1)
 
         train_mu = []
         train_sigma = []
@@ -615,16 +919,17 @@ class VAEG(VAEGConfig):
                 [self.prob, self.ll, self.z_encoded, self.enc_mu, self.enc_sigma, self.cost, self.w_edge],
                 feed_dict=feed_dict)
 
-            '''
+            #'''
             with open(hparams.z_dir+'encoded_input'+str(i)+'.txt', 'a') as f:
                 for z_i in z_encoded:
                     f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
                 f.write("\n")
-            '''
+            #'''
             
             hparams.sample = True
 
-            for j in range(self.n):
+            #for j in range(self.n):
+            for j in [1, 3, 15]:
                 z_encoded_neighborhood = copy.copy(z_encoded)
                 #print("Debug size", z_encoded.shape, z_encoded[0].shape)
                 z_encoded_neighborhood[j] = lerp(z_encoded[j], np.ones(z_encoded[j].shape), ratio)
@@ -648,9 +953,12 @@ class VAEG(VAEGConfig):
                 #indicator = np.ones([self.n, self.bin_dim])
                 #p, list_edges_new, w_new = normalise(prob, w_edge, self.n, hparams.bin_dim, [], list_edges_new, indicator)
                 if not hparams.mask_weight:
+                    print("Non mask")
                     candidate_edges = self.get_unmasked_candidate(list_edges, prob, w_edge, hparams.edges)
                 else:
-                    candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges)
+                    print("Mask")
+                    candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [15, 1, 3, 11] , hparams.edges, hde)
+                    #candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges, hde)
 
                 #for (u, v, w) in candidate_edges:
                 for uvw in candidate_edges.split():

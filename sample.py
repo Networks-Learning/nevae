@@ -87,11 +87,14 @@ if __name__ == '__main__':
     hparams = create_hparams(FLAGS)
     
     # loading the data from a file
-    adj, weight, weight_bin, features, edges = load_data(hparams.graph_file, hparams.nodes, hparams.bin_dim)
+    adj, weight, weight_bin, features, edges, hde = load_data(hparams.graph_file, hparams.nodes, hparams.bin_dim)
+
     #Test code
     #'''
+    e = max([len(edge) for edge in edges])
     
-    model2 = VAEG(hparams, placeholders, hparams.nodes, 1, edges)
+    log_fact_k = log_fact(e) 
+    model2 = VAEG(hparams, placeholders, hparams.nodes, 1, edges, log_fact_k, hde)
     model2.restore(hparams.out_dir)
     #interpolation
     '''
@@ -117,8 +120,12 @@ if __name__ == '__main__':
     '''
     #sample
     i = 0
-    while i < 5 :
-        model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes, (i+1) * 0.00001)
+    while i < 10:
+        model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0, 6)
+
+        #model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes, (i+1) * 0.00001, 6)
+        #model2.sample_graph_posterior(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0.00001)
+
         #model2.sample_graph(hparams, placeholders,adj, features, weight, weight_bin, i+hparams.offset, hparams.nodes, hparams.edges)
         i += 1
     

@@ -80,13 +80,18 @@ if __name__ == '__main__':
     hparams = create_hparams(FLAGS)
     
     # loading the data from a file
-    adj, weight, weight_bin, features, edges = load_data(hparams.graph_file, hparams.nodes, hparams.bin_dim)
+    adj, weight, weight_bin, features, edges, hde = load_data(hparams.graph_file, hparams.nodes, hparams.bin_dim)
     num_nodes = adj[0].shape[0]
     num_features = features[0].shape[1]
+    e = max([len(edge) for edge in edges])
+        
+    log_fact_k = log_fact(e)
     
+    #model2 = VAEG(hparams, placeholders, hparams.nodes, 1, edges, log_fact_k)
+
     # print("Debug", num_nodes, adj[0][0])
     # Training
-    model = VAEG(hparams, placeholders, num_nodes, num_features, edges)
+    model = VAEG(hparams, placeholders, num_nodes, num_features, edges, log_fact_k, hde)
     model.restore(hparams.out_dir)
     #model.initialize()
     model.train(placeholders, hparams, adj, weight, weight_bin, features)
