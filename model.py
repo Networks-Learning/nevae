@@ -536,23 +536,32 @@ class VAEG(VAEGConfig):
 
         node_list = defaultdict()
         rest = range(self.n)
-        hn = np.random.choice(rest, atom_count[0], replace=False)
+        nodes = []
+        hn = [ 0,  4,  3, 10, 22, 24, 19, 29,  7,  5, 23, 21, 26, 15,  9] 
+        #hn = np.random.choice(rest, atom_count[0], replace=False)
         for x in hn:
             node_list[x] = 1
+        nodes.extend(hn)
         rest = list(set(rest) - set(hn))
-        on = np.random.choice(rest, atom_count[1], replace=False)
+        on = [27]
+        #on = np.random.choice(rest, atom_count[1], replace=False)
         for x in on:
             node_list[x] = 2
+        nodes.extend(on)
         rest = list(set(rest) - set(on))
-        nn = np.random.choice(rest, atom_count[2], replace=False)
+        nn = [16, 13,  8]
+        #nn = np.random.choice(rest, atom_count[2], replace=False)
         for x in nn:
             node_list[x] = 3
+        nodes.extend(nn)
         rest = list(set(rest) - set(nn))
-        cn = np.random.choice(rest, atom_count[3], replace=False)
+        #cn = np.random.choice(rest, atom_count[3], replace=False)
+        cn = [28, 11, 18, 20, 25, 14, 12, 17,  2,  6,  1]
         for x in cn:
             node_list[x] = 4
-        nodes = hn + on + nn + cn
+        nodes.extend(cn)
 
+        
         indicator = np.ones([self.n, self.bin_dim])
         edge_mask = np.ones([self.n, self.n])
         degree = np.zeros(self.n)
@@ -569,18 +578,27 @@ class VAEG(VAEGConfig):
                 edge_mask[n1][n2] = 0
         candidate_edges = []
         # first generate edges joining with Hydrogen atoms sequentially
-
+        print("Debug atom ratio", hn, on, nn, cn)
+        print("Debug_degree", node_list)
+        print("Debug nodes", nodes)
         index = 0
         i = 0
         #first handle hydro
         for node in nodes:
             deg_req = node_list[node]
             d = degree[node]
-
+            list_edges = get_candidate_neighbor_edges(node, self.n)
+            #for (u,v,w) in list_edges:
+            #    print("list edges", u, node_list[u], degree[u], indicator[u], v, node_list[v], degree[v], indicator[v])    
+            #print("Debug list edges", node, list_edges)
+            print("Edge mask", edge_mask[node])
             while d < deg_req:
 
                 p = normalise_h1(prob, w_edge,  self.bin_dim, indicator, edge_mask, node)
-                list_edges = get_candidate_neighbor_edges(node, self.n)
+                #print("Debug p", p)
+                #list_edges = get_candidate_neighbor_edges(node, self.n)
+                #for (u,v,w) in list_edges:
+                #    print("Debug list edges", u, v, node_list[u], node_list[v])
                 candidate_edges.extend([list_edges[k] for k in
                                np.random.choice(range(len(list_edges)), [1], p=p, replace=False)])
 
@@ -591,9 +609,57 @@ class VAEG(VAEGConfig):
 
                 edge_mask[u][v] = 0
                 edge_mask[v][u] = 0
+                
+                if u in cn:
+                    if degree[u] >= 4:
+                        indicator[u][0] = 0
+                    if degree[u] >= 3:
+                        indicator[u][1] = 0
+                    if degree[u] >= 2:
+                        indicator[u][2] = 0
+                if u in nn:
+                    if degree[u] >= 3:
+                        indicator[u][0] = 0
+                    if degree[u] >= 2:
+                        indicator[u][1] = 0
+                    if degree[u] >= 1:
+                        indicator[u][2] = 0
+                if u in on:
+                    if degree[u] >= 2:
+                        indicator[u][0] = 0
+                    if degree[u] >= 1:
+                        indicator[u][1] = 0
+                if u in hn:
+                    if degree[u] >= 1:
+                        indicator[u][0] = 0
+
+                if v in cn:
+                    if degree[v] >= 4:
+                        indicator[v][0] = 0
+                    if degree[v] >= 3:
+                        indicator[v][1] = 0
+                    if degree[v] >= 2:
+                        indicator[v][2] = 0
+                if v in nn:
+                    if degree[v] >= 3:
+                        indicator[v][0] = 0
+                    if degree[v] >= 2:
+                        indicator[v][1] = 0
+                    if degree[v] >= 1:
+                        indicator[v][2] = 0
+                if v in on:
+                    if degree[v] >= 2:
+                        indicator[v][0] = 0
+                    if degree[v] >= 1:
+                        indicator[v][1] = 0
+                if v in hn:
+                    if degree[v] >= 1:
+                        indicator[v][0] = 0
+
+
 
                 i+=1
-
+                '''
                 if u in nn and degree[u] == 3:
                     indicator[u][0] = 0
 
@@ -606,18 +672,33 @@ class VAEG(VAEGConfig):
 
                 if v in on and degree[v] == 2:
                     indicator[v][0] = 0
+                
+                if u in on and degree[u] == 1:
+                    indicator[u][0] = 0
+
+                if v in on and degree[v] == 2:
+                    indicator[v][0] = 0
                     indicator[v][1] = 0
+
 
                 if degree[u] >= 4:
                     indicator[u][0] = 0
+                if degree[u] >= 3:
                     indicator[u][1] = 0
+                if degree[u] >= 2:
                     indicator[u][2] = 0
 
                 if degree[v] >= 4:
                     indicator[v][0] = 0
+                if degree[v] >= 3:
                     indicator[v][1] = 0
+                if degree[v] >= 2:
                     indicator[v][2] = 0
+                '''
 
+                print("Debug candidate_edges", candidate_edges[i - 1])
+                for el in range(self.n):
+                    print("change state", el, degree[el], node_list[el], indicator[el])
         candidate_edges_new = ''
         for (u, v, w) in candidate_edges:
             if u < v:
@@ -626,7 +707,7 @@ class VAEG(VAEGConfig):
                     candidate_edges_new += ' ' + str(v) + '-' + str(u) + '-' + str(w)
         return candidate_edges_new
 
-
+    '''
     def get_masked_candidate_with_atom_ratio_new(self, prob, w_edge, atom_count, num_edges, hde):
         
         rest = range(self.n)
@@ -716,7 +797,7 @@ class VAEG(VAEGConfig):
             else:
                 candidate_edges_new += ' '+str(v)+'-'+str(u)+'-'+str(w)
         return candidate_edges_new
-
+    '''
     def get_masked_candidate_with_atom_ratio(self, prob, w_edge, hcount, num_edges, hde):
         
         

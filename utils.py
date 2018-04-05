@@ -36,8 +36,8 @@ def change(p, w, hnodes, nodes, bin_dim, degree, indicator):
 def normalise_h1(prob, weight, bin_dim, indicator, edge_mask, node):
     n = len(prob[0])
     temp = np.ones([n, n])
-    p_rs = np.exp(np.minimum(np.multiply(prob, edge_mask), 10 * temp))
-
+    p_rs = np.exp(np.minimum(prob, 10 * temp))
+   
     temp = np.ones([n, n, bin_dim])
     w_rs = np.exp(np.minimum(weight, 10 * temp))
     combined_problist = []
@@ -46,26 +46,28 @@ def normalise_h1(prob, weight, bin_dim, indicator, edge_mask, node):
     for j in range(n):
         if j != node:
             if j < node:
-                problist.append(p_rs[j][node])
+                problist.append(p_rs[j][node] * edge_mask[j][node])
                 indi = np.multiply(indicator[node], indicator[j])
                 denom = sum(np.multiply(w_rs[j][node], indi))
                 if denom == 0:
                     denom = 1
                     del problist[-1]
                 w_rs[j][node] = np.multiply(w_rs[node][j], indi) / denom
-                combined_problist.extend(p_rs[j][node] * w_rs[j][node])
+                combined_problist.extend(p_rs[j][node] * w_rs[j][node] * edge_mask[j][node])
             else:
-                problist.append(p_rs[node][j])
+                problist.append(p_rs[node][j] * edge_mask[node][j])
                 indi = np.multiply(indicator[node], indicator[j])
-                denom = sum(np.multiply(w_rs[node][j], indi))s
+                denom = sum(np.multiply(w_rs[node][j], indi))
                 if denom == 0:
                     denom = 1
                     del problist[-1]
                 w_rs[node][j] = np.multiply(w_rs[node][j], indi) / denom
-                combined_problist.extend(p_rs[node][j] * w_rs[node][j])
+                combined_problist.extend(p_rs[node][j] * w_rs[node][j] * edge_mask[j][node])
     problist = np.array(problist)
-
-    return combined_problist / problist.sum()
+    combined_problist = np.array(combined_problist)
+    print("Debug", combined_problist.sum(), problist.sum(), problist)
+    #return combined_problist / problist.sum()
+    return combined_problist / combined_problist.sum()
 
 def normalise_h(prob, weight, hnodes, bin_dim , indicator, edge_mask, indexlist):
     

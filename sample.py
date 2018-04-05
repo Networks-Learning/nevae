@@ -120,7 +120,7 @@ if __name__ == '__main__':
     '''
     #sample
     i = 0
-    while i < 10:
+    while i < 1:
         model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0, 6)
 
         #model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes, (i+1) * 0.00001, 6)
