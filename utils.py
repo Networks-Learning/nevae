@@ -31,7 +31,41 @@ def change(p, w, hnodes, nodes, bin_dim, degree, indicator):
                 #indicator_new[k][l] = indicator[i][j]
                 l += 1
         k += 1 
-    return (p_matrix, w_matrix, degree_new, indicator_new)        
+    return (p_matrix, w_matrix, degree_new, indicator_new)
+
+def normalise_h1(prob, weight, bin_dim, indicator, edge_mask, node):
+    n = len(prob[0])
+    temp = np.ones([n, n])
+    p_rs = np.exp(np.minimum(np.multiply(prob, edge_mask), 10 * temp))
+
+    temp = np.ones([n, n, bin_dim])
+    w_rs = np.exp(np.minimum(weight, 10 * temp))
+    combined_problist = []
+    problist = []
+
+    for j in range(n):
+        if j != node:
+            if j < node:
+                problist.append(p_rs[j][node])
+                indi = np.multiply(indicator[node], indicator[j])
+                denom = sum(np.multiply(w_rs[j][node], indi))
+                if denom == 0:
+                    denom = 1
+                    del problist[-1]
+                w_rs[j][node] = np.multiply(w_rs[node][j], indi) / denom
+                combined_problist.extend(p_rs[j][node] * w_rs[j][node])
+            else:
+                problist.append(p_rs[node][j])
+                indi = np.multiply(indicator[node], indicator[j])
+                denom = sum(np.multiply(w_rs[node][j], indi))s
+                if denom == 0:
+                    denom = 1
+                    del problist[-1]
+                w_rs[node][j] = np.multiply(w_rs[node][j], indi) / denom
+                combined_problist.extend(p_rs[node][j] * w_rs[node][j])
+    problist = np.array(problist)
+
+    return combined_problist / problist.sum()
 
 def normalise_h(prob, weight, hnodes, bin_dim , indicator, edge_mask, indexlist):
     
@@ -164,11 +198,19 @@ def get_candidate_edges(n):
 
 def get_candidate_neighbor_edges(index, n):
     list_edges = []
-    for j in range(index + 1, n):
-            # list_edges.append((i,j))
-            list_edges.append((index, j, 1))
-            list_edges.append((index, j, 2))
-            list_edges.append((index, j, 3))
+    for j in range(n):
+            if j == index:
+                continue
+            if j > index:
+                # list_edges.append((i,j))
+                list_edges.append((index, j, 1))
+                list_edges.append((index, j, 2))
+                list_edges.append((index, j, 3))
+            else:
+                # list_edges.append((i,j))
+                list_edges.append((j, index, 1))
+                list_edges.append((j, index, 2))
+                list_edges.append((j, index, 3))
     
     return list_edges
 

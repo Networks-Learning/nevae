@@ -533,6 +533,101 @@ class VAEG(VAEGConfig):
                     f.write(str(-np.mean(loss_total)//10)+'\n')
 
     def get_masked_candidate_with_atom_ratio_new(self, prob, w_edge, atom_count, num_edges, hde):
+
+        node_list = defaultdict()
+        rest = range(self.n)
+        hn = np.random.choice(rest, atom_count[0], replace=False)
+        for x in hn:
+            node_list[x] = 1
+        rest = list(set(rest) - set(hn))
+        on = np.random.choice(rest, atom_count[1], replace=False)
+        for x in on:
+            node_list[x] = 2
+        rest = list(set(rest) - set(on))
+        nn = np.random.choice(rest, atom_count[2], replace=False)
+        for x in nn:
+            node_list[x] = 3
+        rest = list(set(rest) - set(nn))
+        cn = np.random.choice(rest, atom_count[3], replace=False)
+        for x in cn:
+            node_list[x] = 4
+        nodes = hn + on + nn + cn
+
+        indicator = np.ones([self.n, self.bin_dim])
+        edge_mask = np.ones([self.n, self.n])
+        degree = np.zeros(self.n)
+
+        for node in hn:
+            indicator[node][1] = 0
+            indicator[node][2] = 0
+        for node in on:
+            indicator[node][2] = 0
+
+        # two hydrogen atom cannot have an edge between them
+        for n1 in hn:
+            for n2 in hn:
+                edge_mask[n1][n2] = 0
+        candidate_edges = []
+        # first generate edges joining with Hydrogen atoms sequentially
+
+        index = 0
+        i = 0
+        #first handle hydro
+        for node in nodes:
+            deg_req = node_list[node]
+            d = degree[node]
+
+            while d < deg_req:
+
+                p = normalise_h1(prob, w_edge,  self.bin_dim, indicator, edge_mask, node)
+                list_edges = get_candidate_neighbor_edges(node, self.n)
+                candidate_edges.extend([list_edges[k] for k in
+                               np.random.choice(range(len(list_edges)), [1], p=p, replace=False)])
+
+                (u, v, w) = candidate_edges[i]
+                degree[u]+= w
+                degree[v]+= w
+                d += w
+
+                edge_mask[u][v] = 0
+                edge_mask[v][u] = 0
+
+                i+=1
+
+                if u in nn and degree[u] == 3:
+                    indicator[u][0] = 0
+
+                if v in nn and degree[v] == 3:
+                    indicator[v][0] = 0
+
+                if u in on and degree[u] == 2:
+                    indicator[u][0] = 0
+                    indicator[u][1] = 0
+
+                if v in on and degree[v] == 2:
+                    indicator[v][0] = 0
+                    indicator[v][1] = 0
+
+                if degree[u] >= 4:
+                    indicator[u][0] = 0
+                    indicator[u][1] = 0
+                    indicator[u][2] = 0
+
+                if degree[v] >= 4:
+                    indicator[v][0] = 0
+                    indicator[v][1] = 0
+                    indicator[v][2] = 0
+
+        candidate_edges_new = ''
+        for (u, v, w) in candidate_edges:
+            if u < v:
+                    candidate_edges_new += ' ' + str(u) + '-' + str(v) + '-' + str(w)
+            else:
+                    candidate_edges_new += ' ' + str(v) + '-' + str(u) + '-' + str(w)
+        return candidate_edges_new
+
+
+    def get_masked_candidate_with_atom_ratio_new(self, prob, w_edge, atom_count, num_edges, hde):
         
         rest = range(self.n)
         hn = np.random.choice(rest, atom_count[0], replace=False)
