@@ -813,6 +813,7 @@ class VAEG(VAEGConfig):
                 candidate_edges_new += ' '+str(v)+'-'+str(u)+'-'+str(w)
         return candidate_edges_new
     '''
+
     def get_masked_candidate_with_atom_ratio(self, prob, w_edge, hcount, num_edges, hde):
         
         
@@ -900,7 +901,165 @@ class VAEG(VAEGConfig):
         '''
         print("Candidate_new", candidate_edges_new)
         return candidate_edges_new.strip()
-    
+
+    def get_masked_continuous_candidate(self, prob, w_edge, num_edges, list_edges_original, atom_number, indicator=[], degree=[] ):
+
+        list_edges = copy.copy(list_edges_original)
+        if len(indicator) == 0:
+            print("Debug indi new assign")
+            indicator = np.ones([self.n, self.bin_dim])
+        edge_mask = np.ones([self.n, self.n])
+
+        p, list_edges, w = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
+        candidate_edges = [list_edges[k] for k in
+                           np.random.choice(range(len(list_edges)), [1], p=p, replace=False)]
+        # if degree == None:
+        if len(degree) == 0:
+            print("Debug degree new assign")
+            degree = np.zeros([self.n])
+
+        cc = 0
+        nc = 0
+        oc = 0
+        #hc = 0
+
+        ca = False
+        na = False
+        oa = False
+        #ha = False
+        (u, v, w) = candidate_edges[0]
+        list_edges = [(u, v)]
+
+        for i1 in range(num_edges - 1):
+            (u, v, w) = candidate_edges[i1]
+            edge_mask[u][v] = 0
+            edge_mask[v][u] = 0
+            '''
+            for j in range(self.n):
+
+                if reach[u][j] == 0:
+                    reach[v][j] = 0
+                    reach[j][v] = 0
+                if reach[v][j] == 0:
+                    reach[u][j] = 0
+                    reach[j][u] = 0
+
+            reach[u][v] = 0
+            reach[v][u] = 0
+            '''
+
+            degree[u] += w
+            degree[v] += w
+
+            # if degree[u] >= 5:
+            #    indicator[u][0] = 0
+            if degree[u] >= 4:
+                cc += 1
+                indicator[u][0] = 0
+            if degree[u] >= 3:
+                if nc != 0:
+                    nc += 1
+                indicator[u][1] = 0
+            if degree[u] >= 2:
+                if oc != 0:
+                    oc +=1
+                indicator[u][2] = 0
+
+            # if degree[v] >= 5:
+            #    indicator[v][0] = 0
+            if degree[v] >= 4:
+                cc += 1
+                indicator[v][0] = 0
+            if degree[v] >= 3:
+                if nc != 0:
+                    nc += 1
+                indicator[v][1] = 0
+            if degree[v] >= 2:
+                if oc != 0:
+                    oc +=1
+                indicator[v][2] = 0
+
+            if w == 2:
+                indicator[u][1] = 0
+                indicator[v][1] = 0
+
+            # if a double or triple bond has occurs there will be no bridge head
+            '''
+            if w >= 2:
+                #saturation += 1
+                for j in range(i1):
+                    (u1, v1, w1) = candidate_edges[j]
+                    if u == u1:
+                        edge_mask[v][v1] = 0
+                        edge_mask[v1][v] = 0
+                    if u == v1:
+                        edge_mask[v][u1] = 0
+                        edge_mask[u1][v] = 0
+                    if v == u1:
+                        edge_mask[u][v1] = 0
+                        edge_mask[v1][u] = 0
+                    if v == v1:
+                        edge_mask[u][u1] = 0
+                        edge_mask[u1][u] = 0
+            '''
+
+            if cc == atom_number[0]:
+                ca = True
+                for i in range(self.n):
+                    if degree[i] == 3:
+                        nc += 1
+                if nc > atom_number[1]:
+                    return ''
+
+            if nc == atom_number[1]:
+                na = True
+                for i in range(self.n):
+                    if degree[i] == 2:
+                        oc += 1
+                if oc > atom_number[3]:
+                    return ''
+            if oc == atom_number[3]:
+                oa = True
+
+
+            for i in range(self.n):
+                if ca:
+                    if degree[i] >= 3:
+                        indicator[i][0] = 0
+                    if degree[i] >= 2:
+                        indicator[i][1] = 0
+                    if degree[i] >= 1:
+                        indicator[i][2] = 0
+
+                if na:
+                    if degree[i] >= 2:
+                        indicator[i][0] = 0
+                    if degree[i] >= 1:
+                        indicator[i][1] = 0
+                if oa:
+                    if degree[i] >= 1:
+                        indicator[i][0] = 0
+
+            list_edges.extend(get_candidate_neighbor_edges(u, self.n))
+            list_edges.extend(get_candidate_neighbor_edges(u, self.n))
+
+            list_edges = list(set(list_edges))
+
+            p, candidate_list_edges = normalise_h2(prob, w_edge, self.bin_dim, indicator, edge_mask, list_edges)
+            #(prob, weight, bin_dim, indicator, edge_mask, node, list_edges)
+            candidate_edges.extend([list_edges[k] for k in
+                                    np.random.choice(range(len(candidate_list_edges)), [1], p=p, replace=False)])
+
+            candidate_edges_str = ''
+
+            for (u, v, w) in candidate_edges:
+                if u < v:
+                    candidate_edges_str += ' ' + str(u) + '-' + str(v) + '-' + str(w)
+                else:
+                    candidate_edges_str += ' ' + str(v) + '-' + str(u) + '-' + str(w)
+
+        return candidate_edges_str
+
     def get_masked_candidate(self, list_edges, prob, w_edge, num_edges, hde, indicator=[], degree=[]):
 
         list_edges_original = copy.copy(list_edges)
@@ -927,18 +1086,18 @@ class VAEG(VAEGConfig):
                 degree = np.zeros([self.n])
             G = None
             saturation = 0
-            
+
             for i1 in range(num_edges - 1):
                 (u, v, w) = candidate_edges[i1]
                 for j in range(n):
-                    
+
                     if reach[u][j] == 0:
                         reach[v][j] = 0
                         reach[j][v] = 0
                     if reach[v][j] == 0:
                         reach[u][j] = 0
                         reach[j][u] = 0
-                
+
                 reach[u][v] = 0
                 reach[v][u] = 0
 
@@ -1179,7 +1338,8 @@ class VAEG(VAEGConfig):
                 else:
                     print("Mask")
                     #candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [17, 1, 1, 11] , hparams.edges, hde)
-                    candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [19, 1, 1, 9] , hparams.edges, hde)
+                    #candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [19, 1, 1, 9] , hparams.edges, hde)
+                    candidate_edges = self.get_masked_continuous_candidate(prob, w_edge, hparams.num_edges, list_edges,[19, 1, 1, 9])
 
                     #candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [15, 1, 3, 11] , hparams.edges, hde)
                     #candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges, hde)

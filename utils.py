@@ -33,6 +33,32 @@ def change(p, w, hnodes, nodes, bin_dim, degree, indicator):
         k += 1 
     return (p_matrix, w_matrix, degree_new, indicator_new)
 
+def normalise_h2(prob, weight, bin_dim, indicator, edge_mask, list_edges):
+    n = len(prob[0])
+    temp = np.ones([n, n])
+    p_rs = np.exp(np.minimum(prob, 10 * temp))
+
+    temp = np.ones([n, n, bin_dim])
+    w_rs = np.exp(np.minimum(weight, 10 * temp))
+    combined_problist = []
+    problist = []
+    candidate_list_edges = []
+    for (u,v) in list_edges:
+        for i in range(bin_dim):
+            candidate_list_edges.append((u, v, i+1))
+        problist.append(p_rs[u][v]*edge_mask[u][v])
+        indi = np.multiply(indicator[u], indicator[v])
+        denom = sum(np.multiply(w_rs[u][v], indi))
+        if denom == 0:
+            denom = 1
+            del problist[-1]
+        w_rs[u][v] = np.multiply(w_rs[u][v], indi) / denom
+        combined_problist.extend(p_rs[u][v] * w_rs[u][v])
+
+    combined_problist = np.array(combined_problist)
+
+    return combined_problist / combined_problist.sum(), candidate_list_edges
+
 def normalise_h1(prob, weight, bin_dim, indicator, edge_mask, node):
     n = len(prob[0])
     temp = np.ones([n, n])
@@ -204,15 +230,15 @@ def get_candidate_neighbor_edges(index, n):
             if j == index:
                 continue
             if j > index:
-                # list_edges.append((i,j))
-                list_edges.append((index, j, 1))
-                list_edges.append((index, j, 2))
-                list_edges.append((index, j, 3))
+                list_edges.append((index,j))
+                #list_edges.append((index, j, 1))
+                #list_edges.append((index, j, 2))
+                #list_edges.append((index, j, 3))
             else:
-                # list_edges.append((i,j))
-                list_edges.append((j, index, 1))
-                list_edges.append((j, index, 2))
-                list_edges.append((j, index, 3))
+                list_edges.append((j,index))
+                #list_edges.append((j, index, 1))
+                #list_edges.append((j, index, 2))
+                #list_edges.append((j, index, 3))
     
     return list_edges
 
