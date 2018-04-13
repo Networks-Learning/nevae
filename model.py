@@ -537,26 +537,26 @@ class VAEG(VAEGConfig):
         node_list = defaultdict()
         rest = range(self.n)
         nodes = []
-        hn = [ 0,  4,  3, 10, 22, 24, 19, 29,  7,  5, 23, 21, 26, 15,  9] 
-        #hn = np.random.choice(rest, atom_count[0], replace=False)
+        #hn = [ 0,  4,  3, 10, 22, 24, 19, 29,  7,  5, 23, 21, 26, 15,  9] 
+        hn = np.random.choice(rest, atom_count[0], replace=False)
         for x in hn:
             node_list[x] = 1
         nodes.extend(hn)
         rest = list(set(rest) - set(hn))
-        on = [27]
-        #on = np.random.choice(rest, atom_count[1], replace=False)
+        #on = [27]
+        on = np.random.choice(rest, atom_count[1], replace=False)
         for x in on:
             node_list[x] = 2
-        nodes.extend(on)
+        #nodes.extend(on)
         rest = list(set(rest) - set(on))
-        nn = [16, 13,  8]
-        #nn = np.random.choice(rest, atom_count[2], replace=False)
+        #nn = [16, 13,  8]
+        nn = np.random.choice(rest, atom_count[2], replace=False)
         for x in nn:
             node_list[x] = 3
-        nodes.extend(nn)
+        #nodes.extend(nn)
         rest = list(set(rest) - set(nn))
-        #cn = np.random.choice(rest, atom_count[3], replace=False)
-        cn = [28, 11, 18, 20, 25, 14, 12, 17,  2,  6,  1]
+        cn = np.random.choice(rest, atom_count[3], replace=False)
+        #cn = [28, 11, 18, 20, 25, 14, 12, 17,  2,  6,  1]
         for x in cn:
             node_list[x] = 4
         nodes.extend(cn)
@@ -584,14 +584,15 @@ class VAEG(VAEGConfig):
         index = 0
         i = 0
         #first handle hydro
-        for node in nodes:
+        try:
+         for node in nodes:
             deg_req = node_list[node]
             d = degree[node]
             list_edges = get_candidate_neighbor_edges(node, self.n)
             #for (u,v,w) in list_edges:
             #    print("list edges", u, node_list[u], degree[u], indicator[u], v, node_list[v], degree[v], indicator[v])    
             #print("Debug list edges", node, list_edges)
-            print("Edge mask", edge_mask[node])
+            #print("Edge mask", edge_mask[node])
             while d < deg_req:
 
                 p = normalise_h1(prob, w_edge,  self.bin_dim, indicator, edge_mask, node)
@@ -617,22 +618,26 @@ class VAEG(VAEGConfig):
                         indicator[u][1] = 0
                     if degree[u] >= 2:
                         indicator[u][2] = 0
-                if u in nn:
+                #'''
+                if u in nn or u in on:
+                #or u in on or u in hn:
                     if degree[u] >= 3:
                         indicator[u][0] = 0
                     if degree[u] >= 2:
                         indicator[u][1] = 0
                     if degree[u] >= 1:
                         indicator[u][2] = 0
+                '''
                 if u in on:
                     if degree[u] >= 2:
                         indicator[u][0] = 0
                     if degree[u] >= 1:
                         indicator[u][1] = 0
+                ''' 
                 if u in hn:
                     if degree[u] >= 1:
                         indicator[u][0] = 0
-
+                #'''
                 if v in cn:
                     if degree[v] >= 4:
                         indicator[v][0] = 0
@@ -640,23 +645,27 @@ class VAEG(VAEGConfig):
                         indicator[v][1] = 0
                     if degree[v] >= 2:
                         indicator[v][2] = 0
-                if v in nn:
+                #'''
+                #if v in nn or v in on or v in hn:
+                if v in nn or v in on:   
                     if degree[v] >= 3:
                         indicator[v][0] = 0
                     if degree[v] >= 2:
                         indicator[v][1] = 0
                     if degree[v] >= 1:
                         indicator[v][2] = 0
+                '''
                 if v in on:
                     if degree[v] >= 2:
                         indicator[v][0] = 0
                     if degree[v] >= 1:
                         indicator[v][1] = 0
+                '''
                 if v in hn:
                     if degree[v] >= 1:
                         indicator[v][0] = 0
 
-
+                #'''
 
                 i+=1
                 '''
@@ -699,13 +708,19 @@ class VAEG(VAEGConfig):
                 print("Debug candidate_edges", candidate_edges[i - 1])
                 for el in range(self.n):
                     print("change state", el, degree[el], node_list[el], indicator[el])
-        candidate_edges_new = ''
-        for (u, v, w) in candidate_edges:
+         list_edges = get_candidate_edges(self.n) 
+         candidate_rest = ''
+         candidate_rest = self.get_masked_candidate(list_edges, prob, w_edge, num_edges - len(candidate_edges), hde, indicator, degree)
+
+         candidate_edges_new = ''
+         for (u, v, w) in candidate_edges:
             if u < v:
                     candidate_edges_new += ' ' + str(u) + '-' + str(v) + '-' + str(w)
             else:
                     candidate_edges_new += ' ' + str(v) + '-' + str(u) + '-' + str(w)
-        return candidate_edges_new
+         return candidate_edges_new + ' ' + candidate_rest
+        except:
+         return ''
 
     '''
     def get_masked_candidate_with_atom_ratio_new(self, prob, w_edge, atom_count, num_edges, hde):
@@ -1095,26 +1110,41 @@ class VAEG(VAEGConfig):
                 [self.prob, self.ll, self.z_encoded, self.enc_mu, self.enc_sigma, self.cost, self.w_edge],
                 feed_dict=feed_dict)
 
-            #'''
             with open(hparams.z_dir+'encoded_input'+str(i)+'.txt', 'a') as f:
                 for z_i in z_encoded:
                     f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
                 f.write("\n")
+            #print("Debug mu", enc_mu)
+            #print("Debug_sigma", enc_sigma)
+            #''' 
+            with open(hparams.z_dir+'encoded_mu'+str(i)+'.txt', 'a') as f:
+                for z_i in enc_mu:
+                    f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
+                f.write("\n")
+            print("Debug sigma", enc_sigma.shape)
+            with open(hparams.z_dir+'encoded_sigma'+str(i)+'.txt', 'a') as f:
+                for x in range(self.n):
+                 for z_i in enc_sigma[x]:
+                    f.write('['+','.join([str(el) for el in z_i])+']\n')
+                 f.write("\n")
             #'''
+
             
             hparams.sample = True
 
             #for j in range(self.n):
-            for j in [1, 3, 15]:
+            #for j in [1, 3, 15]:
+            for j in [1]:
                 z_encoded_neighborhood = copy.copy(z_encoded)
                 #print("Debug size", z_encoded.shape, z_encoded[0].shape)
-                z_encoded_neighborhood[j] = lerp(z_encoded[j], np.ones(z_encoded[j].shape), ratio)
+                #z_encoded_neighborhood[j] = lerp(z_encoded[j], np.ones(z_encoded[j].shape), ratio)
+                '''
                 with open(hparams.z_dir+'interpolated_input1'+str(i)+'.txt', 'a') as f:
                     for z_i in z_encoded_neighborhood:
                         f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
 
                     f.write("\n")
-
+                '''
                 feed_dict.update({self.eps:z_encoded_neighborhood})
                 
                 prob, ll, z_encoded_neighborhood, enc_mu, enc_sigma, elbo, w_edge = self.sess.run(
@@ -1123,9 +1153,24 @@ class VAEG(VAEGConfig):
 
                 # prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
 
+                with open(hparams.z_dir+'sampled_z'+str(i)+'.txt', 'a') as f:
+                    for z_i in z_encoded:
+                        f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
+                    f.write("\n")
+
                 prob = np.reshape(prob, (self.n, self.n))
 
                 w_edge = np.reshape(w_edge, (self.n, self.n, self.bin_dim))
+                with open(hparams.z_dir+'prob_mat'+str(i)+'.txt', 'a') as f:
+                    for x in range(self.n):
+                        f.write('['+','.join([str(el) for el in prob[x]])+']\n')
+                    f.write("\n")
+                with open(hparams.z_dir+'weight_mat'+str(i)+'.txt', 'a') as f:
+                    for x in range(self.n):
+                        f.write('['+','.join([str(el[0])+' '+str(el[1])+' '+str(el[2]) for el in w_edge[x]])+']\n')
+                    f.write("\n")
+
+
                 #indicator = np.ones([self.n, self.bin_dim])
                 #p, list_edges_new, w_new = normalise(prob, w_edge, self.n, hparams.bin_dim, [], list_edges_new, indicator)
                 if not hparams.mask_weight:
@@ -1133,7 +1178,10 @@ class VAEG(VAEGConfig):
                     candidate_edges = self.get_unmasked_candidate(list_edges, prob, w_edge, hparams.edges)
                 else:
                     print("Mask")
-                    candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [15, 1, 3, 11] , hparams.edges, hde)
+                    #candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [17, 1, 1, 11] , hparams.edges, hde)
+                    candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [19, 1, 1, 9] , hparams.edges, hde)
+
+                    #candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, [15, 1, 3, 11] , hparams.edges, hde)
                     #candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges, hde)
 
                 #for (u, v, w) in candidate_edges:

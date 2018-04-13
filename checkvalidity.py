@@ -77,7 +77,7 @@ def guess_correct_molecules(readfile, writefile, n, multi):
     fw.write("@<TRIPOS>ATOM\n")
     
     atom_count = 0
-    #print "DE", len(degarray), degarray
+    print "DE", len(degarray), degarray
     for i in range(n):
         #print "Debug", i , deg[i]
         if deg[i] == 0:
