@@ -1412,7 +1412,7 @@ class VAEG(VAEGConfig):
             indicator = np.ones([self.n, self.bin_dim])
             
             p, list_edges_new, w_new = normalise(prob, w_edge, self.n, hparams.bin_dim, [], list_edges_new, indicator)
-            if hparams.mask_weight:
+            if not hparams.mask_weight:
                 candidate_edges = [ list_edges[k] for k in np.random.choice(range(len(list_edges)),[num], p=p)]
             else:
                 candidate_edges = [ list_edges_new[k] for k in np.random.choice(range(len(list_edges_new)),[1], p=p, replace=False)]
