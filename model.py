@@ -194,12 +194,9 @@ class VAEG(VAEGConfig):
                 #k = tf.fill([self.n], tf.cast(self.d, tf.float32))
                 k = tf.fill([self.n], tf.cast(self.z_dim, tf.float32))
 
-
                 temp_stack = []
-
                 for i in range(self.n):
                     temp_stack.append(tf.reduce_prod(tf.square(debug_sigma[i])))
-
                 third_term = tf.log(tf.add(tf.stack(temp_stack),tf.fill([self.n],1e-09)))
 
                 return 0.5 * tf.add(tf.subtract(tf.add(first_term ,second_term), k), third_term)
@@ -225,12 +222,6 @@ class VAEG(VAEGConfig):
             edgeprob = ll_poisson(lambda_e, len(self.edges[self.count]))
             nodeprob = ll_poisson(lambda_n, self.n)
             label_loss = label_loss_predict(self.features, label)
-            #hde = ll_poisson(lambda_hde, self.hde[self.count])
-            #edgeprob = tf.Print(edgeprob, [edgeprob], message="Edge Prob")
-            #nodeprob = tf.Print(nodeprob, [nodeprob], message="Node Prob")
-            #label_loss = tf.Print(label_loss, [label_loss], message="Label loss")
-            #print("label_loss kl_loss ll_loss shape", label_loss.shape, kl_loss.shape, likelihood_loss.shape, likelihood_loss)
-            #kl_loss = tf.Print(kl_loss, [kl_loss], message="KL loss")
             
             #return tf.reduce_mean(kl_loss) + edgeprob + nodeprob + likelihood_loss
             return tf.reduce_mean(kl_loss + label_loss) + edgeprob + nodeprob + likelihood_loss
@@ -260,16 +251,9 @@ class VAEG(VAEGConfig):
         self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr)
         self.grad = self.train_op.compute_gradients(self.cost)
         self.grad_placeholder = [(tf.placeholder("float", shape=gr[1].get_shape()), gr[1]) for gr in self.grad]
-        #self.capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in self.grad]  
-        #self.tgv = [self.grad]
-        # self.apply_transform_op = self.train_op.apply_gradients(self.grad_placeholder)
-        #self.apply_transform_op = self.train_op.apply_gradients(self.capped_gvs)
         self.apply_transform_op = self.train_op.apply_gradients(self.grad)
 
         #self.lr = tf.Variable(self.lr, trainable=False)
-        #self.gradient = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4).compute_gradients(self.cost)
-        #self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4).minimize(self.cost)
-        #self.check_op = tf.add_check_numerics_ops()
 	self.sess = tf.Session()
 
     def initialize(self):
@@ -383,29 +367,14 @@ class VAEG(VAEGConfig):
                 node_bad = G_bad[i]
                 if i == index:
                  if inter == "lerp":
-                    #a = lerp(np.reshape(node_good, -1)[:index], np.reshape(node_bad,-1)[:index], ratio).tolist()
-                    #b = np.reshape(node_good, -1)[index:].tolist()
-                    #a.extend(b)
-                    #new_graph.append(a)
-                    #new_graph.append(lerp(np.reshape(node_good, -1)[:index], np.reshape(node_bad,-1)[:index], ratio).tolist().extend(np.reshape(node_good, -1)[index:].tolist()))
                     new_graph.append(lerp(np.reshape(node_good, -1), np.reshape(node_bad,-1), ratio))
                  else:
-                    #a = slerp(np.reshape(node_good, -1)[:index], np.reshape(node_bad,-1)[:index], ratio).tolist()
-                    #b = np.reshape(node_good, -1)[index:].tolist()
-                    #a.extend(b)
-                    #print("Debug",list(lerp(np.reshape(node_good, -1)[:index], np.reshape(node_bad,-1)[:index], ratio)), np.reshape(node_good, -1)[index:])
-                    #new_graph.append(a)
-                    #new_graph.append(slerp(np.reshape(node_good, -1)[:index], np.reshape(node_bad, -1)[:index], ratio).tolist().extend(np.reshape(node_good, -1)[index:].tolist()))
                     new_graph.append(slerp(np.reshape(node_good, -1), np.reshape(node_bad, -1), ratio))
                 else:
                  new_graph.append(np.reshape(node_good, -1))
-            #print "Debug interpolation", len(new_graph), len(new_graph[0]) 
             eps = np.array(new_graph)
-            #print "Debug interpolation", eps.shape
             eps = eps.reshape(eps.shape+(1,))
-            #print "Debug interpolation", eps.shape
             hparams.sample = True
-            #print "EPS", eps
             feed_dict = construct_feed_dict(hparams.learning_rate, hparams.dropout_rate, self.k, self.n, self.d, hparams.decay_rate, placeholders)
             
             #TODO adj and deg are filler and does not required while sampling. Need to clean this part 
@@ -424,14 +393,10 @@ class VAEG(VAEGConfig):
             prob = np.reshape(prob,(self.n, self.n))
             w_edge = np.reshape(w_edge,(self.n, self.n, self.bin_dim))
 
-            #adj = np.zeros([self.n, self.n])
             indicator = np.ones([self.n, self.bin_dim])
-            #print("debug prob", prob)
             p, list_edges, w_new = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
-            #print("Debug p edge", len(p), len(list_edges), p)
 
             candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[1], p=p, replace=False)]
-            #weightlist = [list_weights[k] for k in np.random.choice(range(len(list_weights)),[1], p=w_new[][], replace=False)]
 
             probtotal = 1.0
             degree = np.zeros([self.n])
@@ -443,10 +408,6 @@ class VAEG(VAEGConfig):
                     degree[u] += w
                     degree[v] += w
                     
-                    #wscore_u_v = tf.reduce_sum(tf.multiply(indicator, weight_temp[u][v]))
-                    #poscore_weighted_u_v = wscore_u_v * posscore[u][v]
-                    #if degree[u] >=5 :
-                    #    indicator[u][0] = 0
                     if degree[u] >=4  :
                         indicator[u][0] = 0
                         indicator[u][1] = 0
@@ -463,14 +424,6 @@ class VAEG(VAEGConfig):
                     if degree[v] >=3  :
                         indicator[v][1] = 0        
                         indicator[v][2] = 0
-                
-                    
-                    #print("Debug indicator before", indicator, w_edge[u][v])
-                    #w_edge[u][v] = np.exp(w_edge[u][v])/sum(np.exp(w_edge[u][v]))
-                    #w_edge[u][v] = np.multiply(indicator, w_edge[u][v])
-                    #w_edge[v][u] = np.multiply(indicator, w_edge[v][u])
-                    #print("Debug indicator after",indicator, w_edge[u][v])
-                    #w_edge[u][v] = np.exp(w_edge[u][v])/sum(np.exp(w_edge[u][v]))
                     
                     p, list_edges, w_new = normalise(prob, w_edge, self.n, self.bin_dim, candidate_edges, list_edges, indicator)
                     candidate_edges.extend([ list_edges[k] for k in np.random.choice(range(len(list_edges)),[1], p=p, replace=False)])
@@ -490,7 +443,6 @@ class VAEG(VAEGConfig):
     def get_stat(self, hparams, placeholders, num=10, outdir=None):
         
         adj, features = load_data(hparams.graph_file, hparams.nodes)
-
         hparams.sample = True
         eps = np.random.randn(self.n, self.z_dim, 1)
         for i in range(len(adj)):
