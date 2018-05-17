@@ -469,7 +469,6 @@ class VAEG(VAEGConfig):
                     for l in range(k+1, self.n):
                         if adj[i][k][l] == 1:
                             prob_derived += log(prob[k][l])
-            
 
             with open(hparams.sample_file+'/reconstruction_ll.txt', 'a') as f:
                     f.write(str(-np.mean(ll_total)//10)+'\n')
@@ -899,7 +898,6 @@ class VAEG(VAEGConfig):
 
         list_weight = [1,2,3]
 
-        #approach 2 sampling from prior
         hparams.sample=True
         
         eps = np.random.randn(self.n, self.z_dim, 1) 
