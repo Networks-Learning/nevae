@@ -84,16 +84,26 @@ if __name__ == '__main__':
     add_arguments(nmt_parser)
     FLAGS, unparsed = nmt_parser.parse_known_args()
     hparams = create_hparams(FLAGS)
-    
-    # loading the data from a file
-    adj, features, edges = load_data(hparams.graph_file, hparams.nodes)
 
+    adj, features, edges, neg_edges, bin_edges, posedges,negedges = load_data(hparams.graph_file, hparams.nodes)
     num_nodes = adj[0].shape[0]
+    num_features = features[0].shape[1]
+    #print("Debug", num_nodes, adj[0][0])
+    print("Num edges", len(edges[0]), posedges[0])
+    # Training
+    old = hparams.edges 
+    hparams.edges = num_nodes * num_nodes / 2
+    model2 = VAEG(hparams, placeholders, num_nodes, num_features, edges, neg_edges)
+
+    # loading the data from a file
+    #adj, features, edges, negedges = load_data(hparams.graph_file, hparams.nodes)
+
+    #num_nodes = adj[0].shape[0]
     
     #Test code
     #''' interpolation
     
-    model2 = VAEG(hparams, placeholders, hparams.nodes, 1, edges)
+    #model2 = VAEG(hparams, placeholders, hparams.nodes, 1, edges, negedges)
     model2.restore(hparams.out_dir)
     #hparams.sample = True
     
@@ -112,6 +122,6 @@ if __name__ == '__main__':
         i+=1
     '''
     #''' sampling
-    while i < 100:
-        model2.sample_graph(hparams, placeholders, i+hparams.offset, hparams.nodes, hparams.edges)
+    while i < 10:
+        model2.sample_graph(hparams, placeholders, i+hparams.offset, hparams.nodes, old)
         i += 1

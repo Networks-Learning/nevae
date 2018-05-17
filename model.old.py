@@ -89,29 +89,55 @@ class VAEG(VAEGConfig):
             k = 0
             with tf.variable_scope('NLL'):
 
-                len_logits = prob_dict.shape[0]
-                print "Debug len_logits", len_logits, prob_dict.shape
-                dec_mat = tf.exp(tf.minimum(prob_dict, tf.fill([len_logits, 1], 10.0)))
+                dec_mat_temp = tf.reshape(prob_dict, [self.n, self.n])
+
+                #'''
+
+                #posscore = np.zeros([self.n, self.n])
+                #tf.variable
+                posscorestack = []
+                '''
+                for (u, v) in self.edges[self.count]:
+                    temp1 = tf.exp(tf.minimum(dec_mat_temp[u][v], 10.0))
+                    temp2 = tf.exp(tf.minimum(dec_mat_temp[v][u], 10.0))
+                    posscorestack.append(temp1)
+                    posscorestack.append(temp2)
+                #negscore = np.zeros([self.n, self.n])
+                negscorestack = []
+                for (u, v) in self.negedges[self.count]:
+                    temp1 = tf.exp(tf.minimum(dec_mat_temp[u][v], 10.0))
+                    temp2 = tf.exp(tf.minimum(dec_mat_temp[v][u], 10.0))
+                    negscorestack.append(temp1)
+                    negscorestack.append(temp2)
+                
+                negscore = tf.reduce_sum(negscorestack)
+                softmax_out = tf.truediv(posscorestack, negscore)
+                ll = tf.reduce_sum(tf.log(tf.add(softmax_out, tf.fill([2 * len(self.edges[self.count])], 1e-9))))
+                '''
+                dec_mat = tf.exp(tf.minimum(dec_mat_temp, tf.fill([self.n, self.n], 10.0)))
+
                 dec_mat = tf.Print(dec_mat, [dec_mat], message="my decscore values:")
 
-                posscoremat = dec_mat[:2*len(self.edges[self.count])]
-                print "Posscore softmax", posscoremat.shape
-            
-                negscore = tf.reduce_sum(dec_mat[2*len(self.edges[self.count]):])
-                print "Negative softmax", negscore.shape
 
+                print "Debug dec_mat", dec_mat.shape, dec_mat.dtype, dec_mat
+		comp = tf.subtract(tf.ones([self.n, self.n], tf.float32), self.adj)
+                comp = tf.Print(comp, [comp], message="my comp values:")
+
+		temp = tf.reduce_sum(tf.multiply(comp,dec_mat))
+		negscore = tf.fill([self.n,self.n], temp+1e-9)
                 negscore = tf.Print(negscore, [negscore], message="my negscore values:")
-                negscoremat = tf.fill([2 * len(self.edges[self.count])], negscore)
-                print "negscore", negscoremat.shape
 
-                softmax_out = tf.truediv(posscoremat, negscore)
-                print "Shape softmax", softmax_out.shape
-                
-                ll = tf.reduce_sum(tf.log(tf.add(softmax_out, tf.fill([2 * len(self.edges[self.count])], 1e-9))))
-                print "Shape ll", ll.shape
-                
+		posscore = tf.multiply(self.adj, dec_mat)
+                posscore = tf.Print(posscore, [posscore], message="my posscore values:")
+
+                dec_out = tf.multiply(self.adj, dec_mat) 
+                softmax_out = tf.truediv(posscore, negscore)
+		#softmax_out = tf.truediv(posscore, tf.add(posscore, negscore))
+                ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))),1)
                 if hparams.mask_weight:
-                    ll = masked_ll(posscoremat, negscore)
+                    #ll = masked_gen(posscore, negscore, posscorestack, negscorestack)
+                    ll = masked_ll(posscore, negscore)
+                #'''
             return (-ll)
 
         def kl_gaussian(mu_1, sigma_1,debug_sigma, mu_2, sigma_2):
@@ -160,13 +186,8 @@ class VAEG(VAEGConfig):
         self.features = tf.placeholder(dtype=tf.float32, shape=[self.n, self.d], name='features')
         self.input_data = tf.placeholder(dtype=tf.float32, shape=[self.k, self.n, self.d], name='input')
         self.eps = tf.placeholder(dtype=tf.float32, shape=[self.n, self.z_dim, 1], name='eps')
-        self.positive_edges = tf.placeholder(dtype=tf.int32, shape=[None], name="pos_edges")
-        self.negative_edges = tf.placeholder(dtype=tf.int32, shape=[None], name="neg_edges")
 
-        self.bin_edges = tf.placeholder(dtype=tf.int32, shape=[self.n * (self.n - 1)/2, 2], name='binary_edge')
-
-        self.samplecount = tf.placeholder(dtype=float32, shape=[1], name="counter")
-	self.cell = VAEGCell(self.adj, self.features, self.z_dim, self.bin_edges, self.n, self.positive_edges, self.negative_edges, hparams.edges)
+	self.cell = VAEGCell(self.adj, self.features, self.z_dim)
         self.c_x, enc_mu, enc_sigma, debug_sigma,dec_out, prior_mu, prior_sigma, z_encoded = self.cell.call(self.input_data, self.n, self.d, self.k, self.eps, hparams.sample)
 	self.prob = dec_out
         print('Debug', dec_out.shape)
@@ -180,7 +201,10 @@ class VAEG(VAEGConfig):
         self.train_op = tf.train.AdamOptimizer(learning_rate=self.lr)
         self.grad = self.train_op.compute_gradients(self.cost)
         self.grad_placeholder = [(tf.placeholder("float", shape=gr[1].get_shape()), gr[1]) for gr in self.grad]
-        
+        #self.capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in self.grad]  
+        #self.tgv = [self.grad]
+        # self.apply_transform_op = self.train_op.apply_gradients(self.grad_placeholder)
+        #self.apply_transform_op = self.train_op.apply_gradients(self.capped_gvs)
         self.apply_transform_op = self.train_op.apply_gradients(self.grad)
 
         #self.lr = tf.Variable(self.lr, trainable=False)
@@ -203,7 +227,7 @@ class VAEG(VAEGConfig):
         print("Load the model from {}".format(ckpt.model_checkpoint_path))
         saver.restore(self.sess, ckpt.model_checkpoint_path)
 
-    def train(self, placeholders, hparams, adj, features, bin_edges, posedges, negedges):
+    def train(self, placeholders, hparams, adj, features):
         savedir = hparams.out_dir
         lr = hparams.learning_rate
         dr = hparams.dropout_rate
@@ -222,9 +246,9 @@ class VAEG(VAEGConfig):
         #f = open(hparams.out_dir+"iteration.txt")
         iteration = 0
         #1000
-        start_1 = time.time()
         for epoch in range(num_epochs):
             start = time.time()
+
             for i in range(len(adj)):
                 self.count = i
                 # Learning rate decay
@@ -238,14 +262,9 @@ class VAEG(VAEGConfig):
                 feed_dict.update({self.features: features[i]})
                 feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
                 feed_dict.update({self.eps: eps})
-                #feed_dict.update({self.samplecount: i})
-                feed_dict.update({self.negative_edges: negedges[i]})
-                feed_dict.update({self.positive_edges: posedges[i]})
-                feed_dict.update({self.bin_edges: bin_edges[i]})
-                #'''
-                #grad_vals = self.sess.run([g[0] for g in self.grad], feed_dict=feed_dict)
-                #for j in xrange(len(self.grad_placeholder)):
-                #    feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
+                grad_vals = self.sess.run([g[0] for g in self.grad], feed_dict=feed_dict)
+                for j in xrange(len(self.grad_placeholder)):
+                    feed_dict.update({self.grad_placeholder[j][0]: grad_vals[j]})
                 input_, train_loss, _, probdict, cx= self.sess.run([self.input_data ,self.cost, self.apply_transform_op, self.prob, self.c_x], feed_dict=feed_dict)
 
                 iteration += 1
@@ -253,14 +272,12 @@ class VAEG(VAEGConfig):
                 #print "Debug CX", cx
                 if iteration % hparams.log_every == 0 and iteration > 0:
                     print("{}/{}(epoch {}), train_loss = {:.6f}".format(iteration, num_epochs, epoch + 1, train_loss))
+		    #print(probdict)
                     checkpoint_path = os.path.join(savedir, 'model.ckpt')
                     saver.save(self.sess, checkpoint_path, global_step=iteration)
                     logger.info("model saved to {}".format(checkpoint_path))
-                #'''
             end = time.time()
             print("Debug: time{}/batchsize{}".format(end-start, len(adj)))
-        end_1 = time.time()
-        print("Debug total time: ",end_1-start_1," iteration", num_epochs)
 
     def plot_hspace(self, hparams, placeholders, num):
             #plot the coordinate in hspace
@@ -308,10 +325,6 @@ class VAEG(VAEGConfig):
                 for j in range(i+1, self.n):
                     list_edges.append((i,j))
  
-            all_edges = []
-            for i in range(self.n):
-                for j in range(self.n):
-                    alledges.append(i * n + j)
             #for sample in range(s_num):
             new_graph = []
             for i in range(self.n):
@@ -337,10 +350,6 @@ class VAEG(VAEGConfig):
             feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
             feed_dict.update({self.eps: eps})
             
-            feed_dict.update({self.negative_edges: []})
-            feed_dict.update({self.positive_edges: all_edges})
-            feed_dict.update({self.bin_edges: bin_edges[i]})
-
             prob, ll, kl = self.sess.run([self.prob, self.ll, self.kl],feed_dict=feed_dict)
         
             prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
@@ -512,7 +521,7 @@ class VAEG(VAEGConfig):
             train_z.append(z_encoded)
             
             with open(hparams.z_dir+'train_'+str(i)+'.txt', 'a') as f:
-                for z_i in z_encoded:
+                        for z_i in z_encoded:
                             f.write('['+','.join([str(el[0]) for el in z_i])+']\n')
             
             prob = np.triu(np.reshape(prob,(self.n,self.n)),1)
@@ -631,16 +640,7 @@ class VAEG(VAEGConfig):
         for i in range(self.n):
             for j in range(i+1, self.n):
                     list_edges.append((i,j))
-        
-        
-        all_edges = []
-        for i in range(self.n):
-                for j in range(i,self.n):
-                    all_edges.append(i * self.n + j)
-
-        
-        adj, features, edges, neg_edges, bin_edges, posedges, negedges = load_data(hparams.graph_file, node)
-        #adj, features, edges, neg_edges = load_data(hparams.graph_file, node)
+        adj, features, edges, neg_edges = load_data(hparams.graph_file, node)
         eps = np.random.randn(self.n, self.z_dim, 1) 
         with open(hparams.z_dir+'test_prior_'+str(s_num)+'.txt', 'a') as f:
                     for z_i in eps:
@@ -657,11 +657,7 @@ class VAEG(VAEGConfig):
 	    feed_dict.update({self.features: features[i]})
             feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
             feed_dict.update({self.eps: eps})
-        
-            feed_dict.update({self.negative_edges: []})
-            feed_dict.update({self.positive_edges: all_edges})
-            feed_dict.update({self.bin_edges: bin_edges[i]})
-    
+
             prob, ll, z_encoded, enc_mu, enc_sigma, elbo = self.sess.run([self.prob, self.ll, self.z_encoded, self.enc_mu, self.enc_sigma, self.cost],feed_dict=feed_dict )
             
             end = time.time()
@@ -715,10 +711,6 @@ class VAEG(VAEGConfig):
 	feed_dict.update({self.features:features[0] })
         feed_dict.update({self.input_data: np.zeros([self.k,self.n,self.d])})
         feed_dict.update({self.eps: eps})
-
-        feed_dict.update({self.negative_edges: []})
-        feed_dict.update({self.positive_edges: all_edges})
-        feed_dict.update({self.bin_edges: bin_edges[0]})
 
         prob, ll, z_encoded, kl, sample_mu, sample_sigma, loss = self.sess.run([self.prob, self.ll, self.z_encoded, self.kl, self.enc_mu, self.enc_sigma, self.cost],feed_dict=feed_dict )
         end = time.time()

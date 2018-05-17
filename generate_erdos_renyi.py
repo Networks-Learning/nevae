@@ -4,6 +4,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 #from networkx.generators.tree import random_tree
 from random import choice
+import numpy as np
 
 def random_walk(G, seed, k):
 	walk = [seed]
@@ -20,7 +21,7 @@ def random_walk(G, seed, k):
 def create_graph(n,m,p):
 	#G = nx.circular_ladder_graph(n)
         #G = nx.erdos_renyi_graph(n, p)
-	#G = nx.barabasi_albert_graph(n, m)
+	G = nx.barabasi_albert_graph(n, m)
         #G = random_tree(n)
         #G = nx.random_powerlaw_tree(n, tries = 200)
         #G = nx.star_graph(n)
@@ -33,6 +34,22 @@ def create_graph(n,m,p):
 	#plt.axis('off')
 	#plt.show()
 	return G
+def create_graph_specified_node_edge(n, m):
+    G=nx.Graph()
+    for i in range(n):
+        G.add_node(i)
+    candidate_edges = []
+    for i in range(n):
+        for j in range(i+1,n):
+            if i != j:
+                candidate_edges.append((i,j))
+   
+    edges = np.random.choice(range(len(candidate_edges)), m, replace=False)
+    for i in edges:
+        (u,v) = candidate_edges[i]
+        G.add_edge(u,v)
+
+    return G
 
 def get_params():
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -49,7 +66,6 @@ def get_params():
                             help='Number graph with the same parameter you want to learn')
         parser.add_argument('--file', type=str, default='graph/',
                             help='File to store the graph')
-
 	params = parser.parse_args()
 	return params
 	
@@ -59,9 +75,10 @@ if __name__ == "__main__":
         #G = create_graph(params.n, params.p)
 	#A = nx.adjacency_matrix(G)
         for i in range(params.N):
-            G = create_graph(params.n, params.m, params.p)
-	    A = nx.adjacency_matrix(G)
-            fh = open(params.file+str(i+5)+".edgelist" , "wb")
+            #G = create_graph(params.n, params.m, params.p)
+	    G = create_graph_specified_node_edge(params.n, params.m)
+            A = nx.adjacency_matrix(G)
+            fh = open(params.file+str(i)+".edgelist" , "wb")
             nx.write_edgelist(G, fh)
             fh.write("\n")
 	#fh.close()

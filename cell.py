@@ -7,7 +7,7 @@ from math import exp
 class VAEGCell(object):
     """Variational Auto Encoder cell."""
 
-    def __init__(self, adj, features, z_dim):
+    def __init__(self, adj, features, z_dim, binary_edges, n, pos_edges, neg_edges, n1):
         '''
         Args:
         adj : adjacency matrix
@@ -16,10 +16,12 @@ class VAEGCell(object):
         self.adj = adj
         self.features = features
         self.z_dim = z_dim
-        #self.edges = edges
-        #self.non_edges = non_edges
+        self.binary_edges = binary_edges
         self.name = self.__class__.__name__.lower()
-
+        self.n = n
+        self.neg_edges =   neg_edges
+        self.pos_edges =   pos_edges
+        self.num_edges = n1
     @property
     def state_size(self):
         return (self.n_h, self.n_h)
@@ -68,17 +70,50 @@ class VAEGCell(object):
 	    for i in range(n):
 		temp_stack.append(tf.matmul(enc_sigma[i], eps[i]))
 	    z = tf.add(enc_mu, tf.stack(temp_stack))
+            
             #While we are trying to sample some edges, we sample Z from prior
             if sample:
                 z = eps
- 
+            
+                # The size of the sample(L) has been kept to 10
+                #sampled_negative = np.random.choice(self.non_edges[self.count], 10, replace=False)
+
 	    with tf.variable_scope("Decoder"):
                 z_stack = []
+                #negative sampling
+                pos = 0
+               
+                #'''
+                for i in range(self.num_edges):
+                        value = self.pos_edges[i]
+                        u = value / self.n
+                        v = value % self.n
+                        #for undirected graph
+                        z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis = 1)[0])
+                        if u != v:
+                            z_stack.append(tf.concat(values=(tf.transpose(z[v]), tf.transpose(z[u])), axis = 1)[0])
+
+                print "Len:Z_stack", len(z_stack)
+                if not sample:   
+                    mod_neg = tf.random_shuffle(self.neg_edges)
+                    # sampled edges are here
+                    for i in range(10):
+                        value = mod_neg[i]
+                        #value = self.negative_edges[i]
+                        u = value / self.n
+                        v = value % self.n
+
+                        #for undirected graph
+                        z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis = 1)[0])
+                        z_stack.append(tf.concat(values=(tf.transpose(z[v]), tf.transpose(z[u])), axis = 1)[0])
+                print "Len:Z_stack", len(z_stack)
+                '''
                 for u in range(n):
                     for v in range(n):
                     #for v in range(u+1, n):
                         z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis = 1)[0])
-		dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
+		'''
+                dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
         return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma, z)
 
     def call(self,inputs,n,d,k,eps_passed, sample):

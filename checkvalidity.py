@@ -115,56 +115,59 @@ def load_data(filename, num=0):
     adjlist = []
     featurelist = []
     edgelist = []
-    neg_edgelist = []
-    edge_binary = [] 
-    posedges = []
-    negedges = []
-    for fname in sorted(glob.glob(path+"*")):
+    #for findex in range(2000):
+        
+    #for findex in range(10):
+        
+    for fname in sorted(glob.glob(path+"*.edgelist")):
+        #fname = filename+"/"+str(findex)+".edgelist"
+        #fname = filename+"/"+str(findex+1)+".txt"
+        
         f = open(fname, 'r')
+        #lines = f.read().strip()
+        #linesnew = lines.replace('{', '{\'weight\':').split('\n')
         try:
             G=nx.read_edgelist(f, nodetype=int)
+            #G=nx.parse_edgelist(linesnew, nodetype=int)
         except:
+            print "Except"
             continue
         f.close()
         n = num
-        Gcom = nx.complement(G)
+        #n = len(G.nodes())
         for i in range(n):
             if i not in G.nodes():
                 G.add_node(i)
+        #degreemat = np.zeros((n,n), dtype=np.int)
         degreemat = np.zeros((n,1), dtype=np.float)
-        edge_bin = np.zeros((n * (n-1)/2, 2), dtype=np.int)
-        edges = G.edges()
-        i = 0
-        posedge = []
-        for (u,v) in edges:
-            edge_bin[i][0] = u * n + v
-            posedge.append(u*n+v)
-            edge_bin[i][1] = 1
-            i +=1
-        neg_edges = Gcom.edges()
-        negedge = []
-        for (u,v) in neg_edges:
-            if u == v:
-                continue
-            edge_bin[i][0] = u * n + v
-            negedge.append(u*n+v)
-            edge_bin[i][1] = -1
-            i +=1
 
+        edges = G.edges()
         for u in G.nodes():
+            #degreemat[int(u)][0] = int(G.degree(u)) * 2.0 / n
             degreemat[int(u)][0] = (G.degree(u)*1.0)/(n-1)
-        try:
             edgelist.append(G.edges())
-            neg_edgelist.append(neg_edges)
-            edge_binary.append(edge_bin)
+        try:
             adjlist.append(np.array(nx.adjacency_matrix(G).todense()))
             featurelist.append(degreemat)
-            posedges.append(posedge)
-            negedges.append(negedge)
         except:
             continue
-    return (adjlist, featurelist, edgelist, neg_edgelist, edge_binary, posedges, negedges)
+        #print fname
+    return (adjlist, featurelist, edgelist)
+    #return (nx.adjacency_matrix(G).todense(), degreemat, edges, non_edges)
 
+def proxy(filename, perm = False):
+        print "filename", filename
+        f = open(filename, 'r')
+        G=nx.read_edgelist(f, nodetype=int)
+        n = G.number_of_nodes()
+        edges = G.edges()
+        if perm == True:
+            p = np.identity(n, dtype=np.int)
+            np.random.shuffle(p)
+            adj = np.array(nx.adjacency_matrix(G).todense())
+            adj = np.matmul(np.matmul(p,adj),p.transpose())
+            return adj
+        return np.array(nx.adjacency_matrix(G).todense())
 
 def pickle_save(content, path):
     '''Save the content on the path'''
