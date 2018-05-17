@@ -27,8 +27,10 @@ def getAtom(valency):
     if valency == 1:
         atom = 'H'
     if valency == 5:
+        #atom = 'S'
+        atom = 'N'
+    if valency == 6:
         atom = 'S'
-        #atom = 'N'
     return atom
 
 def guess_correct_molecules(readfile, writefile, n, multi):
@@ -37,7 +39,21 @@ def guess_correct_molecules(readfile, writefile, n, multi):
     try:
         G=nx.read_edgelist(f, nodetype=int)
     except:
+        f = open(readfile)
+        lines = f.read()
+        linesnew = lines.replace("{", "{\'weight\':").split("\n")
+        G = nx.parse_edgelist(linesnew, nodetype=int)
+        #return False
+    #'''
+    try:
+     if not nx.is_connected(G):
+           #return False
+           print "Not connected"
+           return False
+    except:
+        print "Null graph"
         return False
+    #'''
     nodes = len(G.nodes())
     count = 1 
     index = defaultdict(int)
@@ -59,7 +75,7 @@ def guess_correct_molecules(readfile, writefile, n, multi):
     maxdeg = deg.max()
     #if maxdeg >= 6:
     #    return False
-    if maxdeg >= 6:
+    if maxdeg >= 7:
         return False
     #print degarray
     CC = 0 
@@ -77,7 +93,7 @@ def guess_correct_molecules(readfile, writefile, n, multi):
     fw.write("@<TRIPOS>ATOM\n")
     
     atom_count = 0
-    print "DE", len(degarray), degarray
+    #print "DE", len(degarray), degarray
     for i in range(n):
         #print "Debug", i , deg[i]
         if deg[i] == 0:
@@ -118,10 +134,14 @@ def drawchem(mols):
         #print tokens
         mol = Chem.RemoveHs(mol)
         AllChem.Compute2DCoords(mol)
-        mollist.append(mol)
-        Draw.MolToFile(mol,sys.argv[5]+tokens+'.pdf')
-
+        #mollist.append(mol)
+        
+        img = Draw.MolsToGridImage([mol], molsPerRow = 1, subImgSize=(300, 300), useSVG=True)
+        with open(sys.argv[5]+tokens+".svg", "w") as text_file:
+                #text_file.write(img)
+                Draw.MolToFile(mol,sys.argv[5]+tokens+'.svg', size=(300, 200))
         count += 1 
+
 def calculate_property(m):
     SA_score = -sascorer.calculateScore(m)
     MW = Descriptors.MolWt(m)
@@ -139,23 +159,26 @@ if __name__=="__main__":
     moltotal = 0
     smiles = []
     mols = []
+    invalid = []
 
     for readfile in sorted(glob.glob(readfileDir)):
         moltotal +=1
-        print readfile
+        #print readfile
         if guess_correct_molecules(readfile, writefile, int(sys.argv[3]), int(sys.argv[4])):
             total += 1
             m1 = Chem.MolFromMol2File(sys.argv[2])
             if m1 != None:
                 s = Chem.MolToSmiles(m1)
                 m2 = Chem.AddHs(m1)
-                #sa, mw, rb, logp = calculate_property(m1)
                 smiles.append(s)
-                #with open(sys.argv[5]+'properties.txt', 'a') as f:
-                #    f.write(readfile + " "+str(sa)+" "+str(mw)+ " "+str(rb)+ " "+ str(logp)+"\n")
                 mols.append((m2, readfile))
-                #, sa, mw, rb, logp))
-                #mols.append(m1)
                 valid += 1
+        else:
+                invalid.append(readfile)
+
+    #with open(sys.argv[5]+"smiles_5000.txt", 'a') as fw:
+    #    for smile in smiles:
+    #        fw.write(smile+"\n")
+    print smiles, len(smiles)
     print "Valid:", valid, "Total:", total, "moltotal:",moltotal, "Perc:", valid/total
     drawchem(mols)

@@ -1,7 +1,6 @@
 import tensorflow as tf
 from utils import *
 
-#'''
 def input_layer(c_mat, adj,weight, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
     # The dimension of w_in is a hyperparameter and for out experiments we keep 5
     w_in = tf.get_variable(name="w_in", shape=[k,d,5], initializer=tf.constant_initializer(0.5))
@@ -10,7 +9,6 @@ def input_layer(c_mat, adj,weight, feature, k,n,d,activation = None, batch_norm 
     for i in range(k):
         if i > 0:
             output_list.append( tf.multiply(tf.matmul(feature, w_in[i]),tf.matmul(tf.multiply(adj,weight), output_list[i-1])))
-
         else:
             output_list.append(tf.matmul(feature, w_in[i]))
     return tf.stack(output_list)

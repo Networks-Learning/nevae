@@ -92,40 +92,26 @@ if __name__ == '__main__':
     #Test code
     #'''
     e = max([len(edge) for edge in edges])
-    
+    n_f = len(features[0][0])
     log_fact_k = log_fact(e) 
-    model2 = VAEG(hparams, placeholders, hparams.nodes, 1, edges, log_fact_k, hde)
+    model2 = VAEG(hparams, placeholders, hparams.nodes, n_f, edges, log_fact_k, hde)
     model2.restore(hparams.out_dir)
-    #interpolation
+    #interpolation 
+    #'''
+    latent_points = []
+    for i1 in range(len(adj)):
+        sample1 = model2.getembeddings(hparams, placeholders, adj[i1], features[i1], weight_bin[i1], weight[i1])
+        latent_points.append(np.reshape(np.array(sample1), -1))
+    #np.savetxt("latent_features.txt", np.array(latent_points))
     '''
-    [i1, i2] =  [i for i in np.random.choice(len(adj), 2)]
-    sample1 = model2.getembeddings(hparams, placeholders, adj[i1], features[i1],weight_bin[i1], weight[i1])
-    sample2 = model2.getembeddings(hparams, placeholders, adj[i2], features[i2],weight_bin[i2], weight[i2])
-    i = 0
-    with open(hparams.sample_file + "inter/start_1.txt", "a") as f:
-        f.write("#"+str(i1)+"\n")
-        for (u,v,w) in edges[i1]:
-                f.write(str(u)+" "+str(v)+" {\'weight\':"+str(w)+"}\n")
-    with open(hparams.sample_file + "inter/start_2.txt", "a") as f:
-        f.write("#"+str(i2)+"\n")
-        for (u,v,w) in edges[i2]:
-                f.write(str(u)+" "+str(v)+" {\'weight\':"+str(w)+"}\n")
-    
-    while i < 19:
-        for index in range(1,20):
-            model2.sample_graph_slerp(hparams, placeholders, i, sample1, sample2, 'lerp', (i+1)*0.05, index, num=11)
-            model2.sample_graph_slerp(hparams, placeholders, i, sample1, sample2, 'slerp', (i+1)*0.05, index, num=11)
-        i+=1
-    
-    '''
+    #'''
     #sample
     i = 0
-    while i < 1:
-        model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0, 6)
-
+    while i < 10000:
+        model2.sample_graph_posterior_new(hparams, placeholders, adj[0], features[0], weight_bin[0], weight[0], sample1, k=i)
+        #model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0.001, 6)
+        #model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0.02, 6)
         #model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes, (i+1) * 0.00001, 6)
         #model2.sample_graph_posterior(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0.00001)
-
-        #model2.sample_graph(hparams, placeholders,adj, features, weight, weight_bin, i+hparams.offset, hparams.nodes, hparams.edges)
+        #model2.sample_graph(hparams, placeholders,adj, features, weight, weight_bin, i+hparams.offset, hde, hparams.nodes, hparams.edges)
         i += 1
-    

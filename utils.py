@@ -38,6 +38,7 @@ def normalise_h2(prob, weight, bin_dim, indicator, edge_mask, list_edges):
     temp = np.ones([n, n])
     p_rs = np.exp(np.minimum(prob, 10 * temp))
 
+    
     temp = np.ones([n, n, bin_dim])
     w_rs = np.exp(np.minimum(weight, 10 * temp))
     combined_problist = []
@@ -47,16 +48,17 @@ def normalise_h2(prob, weight, bin_dim, indicator, edge_mask, list_edges):
         for i in range(bin_dim):
             candidate_list_edges.append((u, v, i+1))
         problist.append(p_rs[u][v]*edge_mask[u][v])
+        
         indi = np.multiply(indicator[u], indicator[v])
         denom = sum(np.multiply(w_rs[u][v], indi))
         if denom == 0:
             denom = 1
-            del problist[-1]
+            #del problist[-1]
         w_rs[u][v] = np.multiply(w_rs[u][v], indi) / denom
-        combined_problist.extend(p_rs[u][v] * w_rs[u][v])
+        combined_problist.extend(p_rs[u][v] * edge_mask[u][v] * w_rs[u][v])
 
     combined_problist = np.array(combined_problist)
-
+    #print("Debug utils", problist, combined_problist)
     return combined_problist / combined_problist.sum(), candidate_list_edges
 
 def normalise_h1(prob, weight, bin_dim, indicator, edge_mask, node):
@@ -91,7 +93,8 @@ def normalise_h1(prob, weight, bin_dim, indicator, edge_mask, node):
                 combined_problist.extend(p_rs[node][j] * w_rs[node][j] * edge_mask[j][node])
     problist = np.array(problist)
     combined_problist = np.array(combined_problist)
-    print("Debug", combined_problist.sum(), problist.sum(), problist)
+    
+    #print("Debug", combined_problist.sum(), problist.sum(), problist)
     #return combined_problist / problist.sum()
     return combined_problist / combined_problist.sum()
 
@@ -230,15 +233,15 @@ def get_candidate_neighbor_edges(index, n):
             if j == index:
                 continue
             if j > index:
-                list_edges.append((index,j))
-                #list_edges.append((index, j, 1))
-                #list_edges.append((index, j, 2))
-                #list_edges.append((index, j, 3))
+                #list_edges.append((index,j))
+                list_edges.append((index, j, 1))
+                list_edges.append((index, j, 2))
+                list_edges.append((index, j, 3))
             else:
-                list_edges.append((j,index))
-                #list_edges.append((j, index, 1))
-                #list_edges.append((j, index, 2))
-                #list_edges.append((j, index, 3))
+                #list_edges.append((j,index))
+                list_edges.append((j, index, 1))
+                list_edges.append((j, index, 2))
+                list_edges.append((j, index, 3))
     
     return list_edges
 
@@ -352,6 +355,8 @@ def load_data(filename, num=0, bin_dim=3):
     filenumber = int(len(glob.glob(path)) * 1)
     
     for fname in sorted(glob.glob(path))[:filenumber]:
+        if "ZINC85802226.txt" in fname or "ZINC85802228" in fname:
+            continue
         f = open(fname, 'r')
         try:
             G=nx.read_edgelist(f, nodetype=int)
@@ -368,14 +373,24 @@ def load_data(filename, num=0, bin_dim=3):
         for i in range(n):
             if i not in G.nodes():
                 G.add_node(i)
-        degreemat = np.zeros((n,1), dtype=np.float)
-        count = np.zeros(5)
+
+        # We assume there are only 4 types of atoms 
+        degreemat = np.zeros((n, 4), dtype=np.float)
+        #degreemat = np.zeros((n,1), dtype=np.float)
+        count = np.zeros(4)
 
         for u in G.nodes():
-            degreemat[int(u)][0] = (G.degree(u)*1.0)/(n-1)
-            count[G.degree(u)] += 1
-        hde = (2 * count[4] + 2 + count[3] - count[1]) / 2
+            if G.degree(u) == 3 or G.degree(u) == 5:
+                index = 2
+            else:
+                index = G.degree(u) -1
+            degreemat[int(u)][index] = 1 
+            #degreemat[int(u)][0] = (G.degree(u)*1.0)/(n-1)
+            #count[G.degree(u)] += 1
+
+        hde = (2 * count[3] + 2 + count[2] - count[0]) / 2
         hdelist.append(hde)
+        
         try:
             weight = np.array(nx.adjacency_matrix(G).todense())
             adj = np.zeros([n,n])
@@ -394,7 +409,9 @@ def load_data(filename, num=0, bin_dim=3):
             featurelist.append(degreemat)
             edgelist.append(edges)
         except:
+            print("Error")
             continue
+    
     return (adjlist, weightlist, weight_binlist, featurelist, edgelist, hdelist)
 
 def pickle_save(content, path):

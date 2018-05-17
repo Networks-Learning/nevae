@@ -17,8 +17,6 @@ class VAEGCell(object):
         self.features = features
         self.z_dim = z_dim
         self.weight = weight
-        #self.edges = edges
-        #self.non_edges = non_edges
         self.name = self.__class__.__name__.lower()
         self.bin_dim = bin_dim
     @property
@@ -77,21 +75,31 @@ class VAEGCell(object):
 	    with tf.variable_scope("Decoder"):
                 z_stack = []
                 z_stack_weight = []
+                z_stack_label = []
+
                 for u in range(n):
+                    #'''
+                    for j in range(4):
+                            # we considered 4 types of atom C, H, O, N,
+                            m = np.zeros((1, 4))
+                            m[0][j] = 1
+                            z_stack_label.append(tf.concat(values=(tf.transpose(z[u]),m), axis = 1)[0])
+                    #'''    
                     for v in range(n):
                         z_stack.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v])), axis = 1)[0])
                         #m = np.zeros((1, self.bin_dim))
                         for j in range(self.bin_dim):
                             #z_stack_weight.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v]),[[j+1]]), axis = 1)[0])
-		            #'''
                             m = np.zeros((1, self.bin_dim))
                             m[0][j] = 1
                             z_stack_weight.append(tf.concat(values=(tf.transpose(z[u]), tf.transpose(z[v]),m), axis = 1)[0])
-                            #'''
 
                 dec_hidden = fc_layer(tf.stack(z_stack), 1, activation=tf.nn.softplus, scope = "hidden")
                 weight = fc_layer(tf.stack(z_stack_weight), 1, activation=tf.nn.softplus, scope = "marker")
-        return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma, z, weight)
+                label = fc_layer(tf.stack(z_stack_label), 1, activation=tf.nn.softplus, scope = "label")
+
+        #return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma, z, weight,[])
+        return (c_x,enc_mu, enc_sigma, debug_sigma, dec_hidden, prior_mu, prior_sigma, z, weight, label)
 
     def call(self,inputs,n,d,k,eps_passed, sample):
             return self.__call__(inputs,n,d,k, eps_passed, sample)
