@@ -2,8 +2,8 @@ import tensorflow as tf
 from utils import *
 
 def input_layer(c_mat, adj,weight, feature, k,n,d,activation = None, batch_norm = False, istrain = False, scope = None):
-    # The dimension of w_in is a hyperparameter and for out experiments we keep 5
-    w_in = tf.get_variable(name="w_in", shape=[k,d,5], initializer=tf.constant_initializer(0.5))
+    
+    w_in = tf.get_variable(name="w_in", shape=[k,d,d], initializer=tf.constant_initializer(0.5))
     w_in = tf.Print(w_in,[w_in], message="my w_in-values:")
     output_list = []
     for i in range(k):

@@ -355,8 +355,6 @@ def load_data(filename, num=0, bin_dim=3):
     filenumber = int(len(glob.glob(path)) * 1)
     
     for fname in sorted(glob.glob(path))[:filenumber]:
-        if "ZINC85802226.txt" in fname or "ZINC85802228" in fname:
-            continue
         f = open(fname, 'r')
         try:
             G=nx.read_edgelist(f, nodetype=int)

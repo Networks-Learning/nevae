@@ -8,7 +8,7 @@ import logging
 import copy
 import os
 import time
-
+import networkx as nx
 from collections import defaultdict
 from operator import itemgetter
 
@@ -170,7 +170,7 @@ class VAEG(VAEGConfig):
                     #print("Mask weight option")
                     ll = masked_ll(weight_temp, weight_negative, posscore, posweightscore, temp_pos_score, temp)
                 else:
-                    ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))),1)
+                    ll = tf.reduce_sum(tf.log(tf.add(tf.multiply(self.adj, softmax_out), tf.fill([self.n,self.n], 1e-9))))
                 ll = tf.Print(ll, [ll], message="My loss")
 
             return (-ll)
@@ -597,8 +597,6 @@ class VAEG(VAEGConfig):
                 
                 i+=1 
                 print("Debug candidate_edges", candidate_edges[i - 1])
-                #'''
-                #for el in range(self.n):
                 #    print("change state", el, degree[el], node_list[el], indicator[el])
                 #'''
          #list_edges = get_candidate_edges(self.n) 
@@ -606,10 +604,6 @@ class VAEG(VAEGConfig):
          #    return ''
          #''' 
          candidate_rest = ''
-         '''
-         candidate_rest = self.get_masked_candidate(list_edges, prob, w_edge, num_edges - len(candidate_edges), hde, indicator, degree)
-         ###
-         ''' 
          candidate_edges_new = ''
          for (u, v, w) in candidate_edges:
             if u < v:
@@ -778,14 +772,14 @@ class VAEG(VAEGConfig):
         print("Debug label sum:", label_new_sum.shape)
 
         prob_label = label_new / label_new_sum 
-        pred_label = np.zeros(5)
+        pred_label = np.zeros(4)
         valency_arr = np.zeros(node)
 
         print("Debug prob label shape:", prob_label.shape, prob_label)
 
         #print("Debug label", label_new)
         for i in range(node):
-            valency = np.random.choice(range(5),[1], p=prob_label[i])
+            valency = np.random.choice(range(4),[1], p=prob_label[i])
             pred_label[valency]+= 1
             valency_arr[i] = valency + 1
 
@@ -922,20 +916,49 @@ class VAEG(VAEGConfig):
         p, list_edges, w_new = normalise(prob, w_edge, self.n, self.bin_dim, [], list_edges, indicator)
         
         if not hparams.mask_weight:
-            candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[hparams.edges], p=p, replace=False)]
-        else:    
-            (atom_list, valency_arr) = self.getatoms(hparams.nodes, labels)
             trial = 0
-            #findingout max occuring structure
-            while trial < 1000:
-                candidate_edges = self.get_masked_candidate_with_atom_ratio_new(prob, w_edge, valency_arr, hparams.edges, hde)
+            while trial < 5000:
+                candidate_edges = [ list_edges[i] for i in np.random.choice(range(len(list_edges)),[hparams.edges], p=p, replace=False)]
+                with open(hparams.sample_file + 'test.txt', 'w') as f:
+                    for (u,v,w) in candidate_edges:
+                        if (u >= 0 and v >= 0):
+                            f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
+                f = open(hparams.sample_file + 'test.txt')
+                G=nx.read_edgelist(f, nodetype=int)
+                if nx.is_connected(G):
+                    for (u,v,w) in candidate_edges:
+                        if (u >= 0 and v >= 0):
+                            with open(hparams.sample_file + "approach_2_" + str(trial) +"_"+str(s_num)+ '.txt', 'a') as f:
+                                f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
+                trial+= 1
+ 
+        else:    
+            trial = 0
+            while trial < 5000:
+                candidate_edges = self.get_masked_candidate(list_edges, prob, w_edge, hparams.edges, hde)
+                #print("Debug candidate", candidate_edges)
                 if len(candidate_edges) > 0:
-                    for uvw in candidate_edges.split():
+                    with open(hparams.sample_file + 'test.txt', 'w') as f:
+                     for uvw in candidate_edges.split():
                         [u,v,w] = uvw.split("-")
                         u = int(u)
                         v = int(v)
                         w = int(w)
                         if (u >= 0 and v >= 0):
-                            with open(hparams.sample_file + "approach_1_" + str(trial) +"_"+str(s_num)+ '.txt', 'a') as f:
-                                f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
+                            f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
+                    f = open(hparams.sample_file + 'test.txt')
+                    #try:
+                    G=nx.read_edgelist(f, nodetype=int)
+                    #except:
+                    #continue
+                    
+                    if nx.is_connected(G):
+                        for uvw in candidate_edges.split():
+                            [u,v,w] = uvw.split("-")
+                            u = int(u)
+                            v = int(v)
+                            w = int(w)
+                            if (u >= 0 and v >= 0):
+                                with open(hparams.sample_file + "approach_2_" + str(trial) +"_"+str(s_num)+ '.txt', 'a') as f:
+                                    f.write(str(u) + ' ' + str(v) + ' {\'weight\':' + str(w) + '}\n')
                 trial += 1

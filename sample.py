@@ -96,22 +96,17 @@ if __name__ == '__main__':
     log_fact_k = log_fact(e) 
     model2 = VAEG(hparams, placeholders, hparams.nodes, n_f, edges, log_fact_k, hde)
     model2.restore(hparams.out_dir)
-    #interpolation 
-    #'''
     latent_points = []
+    '''
     for i1 in range(len(adj)):
         sample1 = model2.getembeddings(hparams, placeholders, adj[i1], features[i1], weight_bin[i1], weight[i1])
         latent_points.append(np.reshape(np.array(sample1), -1))
-    #np.savetxt("latent_features.txt", np.array(latent_points))
     '''
-    #'''
+    #np.savetxt("latent_features.txt", np.array(latent_points))
+    
     #sample
     i = 0
-    while i < 10000:
-        model2.sample_graph_posterior_new(hparams, placeholders, adj[0], features[0], weight_bin[0], weight[0], sample1, k=i)
-        #model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0.001, 6)
-        #model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0.02, 6)
-        #model2.sample_graph_neighborhood(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes, (i+1) * 0.00001, 6)
-        #model2.sample_graph_posterior(hparams, placeholders, adj, features, weight, weight_bin, i, hparams.nodes,  0.00001)
-        #model2.sample_graph(hparams, placeholders,adj, features, weight, weight_bin, i+hparams.offset, hde, hparams.nodes, hparams.edges)
+    while i < 1:
+        model2.sample_graph(hparams, placeholders,adj, features, weight, weight_bin, i+hparams.offset, hde, hparams.nodes, hparams.edges)
         i += 1
+

@@ -26,11 +26,8 @@ def getAtom(valency):
         atom = 'O'
     if valency == 1:
         atom = 'H'
-    if valency == 5:
-        #atom = 'S'
-        atom = 'N'
     if valency == 6:
-        atom = 'S'
+        atom = 'S' 
     return atom
 
 def guess_correct_molecules(readfile, writefile, n, multi):
@@ -47,7 +44,6 @@ def guess_correct_molecules(readfile, writefile, n, multi):
     #'''
     try:
      if not nx.is_connected(G):
-           #return False
            print "Not connected"
            return False
     except:
@@ -71,12 +67,12 @@ def guess_correct_molecules(readfile, writefile, n, multi):
         deg.append(np.sum(adj[i]))
     
     deg = np.array(deg)
-    print "debug", deg
+    #print "debug", deg
     maxdeg = deg.max()
-    #if maxdeg >= 6:
-    #    return False
-    if maxdeg >= 7:
+    if maxdeg >= 5:
         return False
+    #if maxdeg >= 7 or maxdeg == 5 :
+    #    return False
     #print degarray
     CC = 0 
     HC = 0
@@ -176,9 +172,9 @@ if __name__=="__main__":
         else:
                 invalid.append(readfile)
 
-    #with open(sys.argv[5]+"smiles_5000.txt", 'a') as fw:
-    #    for smile in smiles:
-    #        fw.write(smile+"\n")
-    print smiles, len(smiles)
-    print "Valid:", valid, "Total:", total, "moltotal:",moltotal, "Perc:", valid/total
-    drawchem(mols)
+    #print smiles, len(smiles)
+    with open('smiles.smi', 'w') as f:
+        for smile in smiles:
+            f.write(smile+"\n")
+    print "Valid:", valid, "Total:", total, "moltotal:",moltotal, "Perc:", valid/moltotal
+    #drawchem(mols)
