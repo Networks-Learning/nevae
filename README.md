@@ -1,9 +1,20 @@
-# Command for generating erdos renyi graph
+# Designing Random Graph Models Using Variational Autoencoders With Applications to Chemical Design
+Paper : https://arxiv.org/pdf/1802.05283.pdf
 
-python generate_erdos_renyi.py --n 10 --p 0.5 --m 2 --k 3
+## Required packages
+-`tensorflow 1.4.1`
 
-# Command for learning
+-`rdkit >= 2016.03.4`
 
-python main.py --num_epochs=1 --learning_rate=0.001 --log_every 20 --graph_file=graph/ --out_dir=output/ --sample_file=sample/ --random_walk=3 --z_dir plot_z/
+-`networkx 2.0`
 
-# For real data please checkout the branch node_label
+## Command to learn model
+
+`python main.py --num_epochs 10 --learning_rate 0.0001 --log_every 5 --z_dim <z> --random_walk <k> --edges <e> --nodes <n> --graph_file <graph> --z_dir <zspace> --sample_file <sampledir> --out_dir <outputdir> >  log.out`
+
+## Command to sample graph
+
+`python sample.py --num_epochs 10 --learning_rate 0.0001 --log_every 5 --z_dim <z> --random_walk <k> --edges <e> --nodes <n> --graph_file <graph> --z_dir <zspace> --sample_file <sample> --out_dir <outputfile> > log.out`
+
+
+## For real data please checkout the branch node_label
