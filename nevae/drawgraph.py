@@ -10,11 +10,11 @@ from collections import defaultdict
 		
 def draw_graph(G, name, pos):
         pos = graphviz_layout(G)
-        nx.draw_networkx(G, node_size=400 ,pos=pos,with_labels= True)
+        nx.draw_networkx(G, node_size=600 ,pos=pos,with_labels= True)
         #nx.draw_networkx(G, pos=circular_layout(G),with_labels= True)
         plt.axis('off')
         #plt.title(title)
-        plt.savefig(sys.argv[2]+name+'.pdf')
+        plt.savefig(sys.argv[2]+name+'.png')
         plt.gcf().clear()
 
 if __name__ == "__main__":

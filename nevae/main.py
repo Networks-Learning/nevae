@@ -35,23 +35,20 @@ def add_arguments(parser):
 
     parser.add_argument("--random_walk", type=int, default=5, help="random walk depth")
     parser.add_argument("--z_dim", type=int, default=5, help="z_dim")
+    parser.add_argument("--nodes", type=int, default=5, help="z_dim")
+    parser.add_argument("--bin_dim", type=int, default=3, help="bin_dim")
 
     parser.add_argument("--graph_file", type=str, default=None,
                         help="The dictory where the training graph structure is saved")
     parser.add_argument("--z_dir", type=str, default=None,
                         help="The z values will be stored file to be stored")
     parser.add_argument("--sample", type=bool, default=False, help="True if you want to sample")
-
-    parser.add_argument("--mask_weight", type=bool, default=False, help="True if we want to mask")
-
+    parser.add_argument("--mask_weight", type=bool, default=False, help="True if you want to mask weight")
+    parser.add_argument("--neg_sample_size", type=int, default=10, help="number of negative edges to be sampled")
+    parser.add_argument("--node_sample", type=int, default=1, help="number of nodes to be sampled")
+    parser.add_argument("--bfs_sample", type=int, default=1, help="number of times bfs to run")
     parser.add_argument("--out_dir", type=str, default=None,
                         help="Store log/model files.")
-    parser.add_argument("--edges", type=int, default=30, help="Number of edges to sample.")
-    
-    parser.add_argument("--nodes", type=int, default=10, help="Number of nodes to sample.")
-    parser.add_argument("--offset", type=int, default=0, help="offset of sample.")
-
-
 
 def create_hparams(flags):
   """Create training hparams."""
@@ -70,13 +67,15 @@ def create_hparams(flags):
       num_epochs=flags.num_epochs,
       random_walk=flags.random_walk,
       log_every=flags.log_every,
-      mask_weight=flags.mask_weight,
+      nodes=flags.nodes,
+      bin_dim = flags.bin_dim,
+      mask_weight = flags.mask_weight,
       
       #sample
       sample=flags.sample,
-      edges=flags.edges,
-      nodes=flags.nodes,
-      offset=flags.offset
+      neg_sample_size=flags.neg_sample_size,
+      node_sample=flags.node_sample,
+      bfs_sample=flags.bfs_sample
       )
 
 if __name__ == '__main__':
@@ -86,32 +85,20 @@ if __name__ == '__main__':
     hparams = create_hparams(FLAGS)
     
     # loading the data from a file
-    adj, features, edges = load_data(hparams.graph_file, hparams.nodes)
-
+    adj, weight, weight_bin, features, edges, neg_edges, features1, = load_data_new(hparams.graph_file, hparams.nodes, hparams.node_sample, hparams.bfs_sample, hparams.bin_dim)
     num_nodes = adj[0].shape[0]
-    
-    #Test code
-    #''' interpolation
-    
-    model2 = VAEG(hparams, placeholders, hparams.nodes, 1, edges)
-    model2.restore(hparams.out_dir)
-    #hparams.sample = True
-    
-    i = 0
-    '''
-    # getting embeddings
-    sample_1 = model2.getembeddings(hparams, placeholders, adj[i], features[i])
-    '''
-    '''
-    sample_1 = model2.getembeddings(hparams, placeholders, adj[0], features[0]) 
-    sample_2 = model2.getembeddings(hparams, placeholders, adj[1], features[1])
-    
-    while i < 1:
-        model2.sample_graph_slerp(hparams, placeholders, i,sample_1, sample_2, "slerp", (i+1)*0.1, num=70)
-        model2.sample_graph_slerp(hparams, placeholders, i,sample_1, sample_2, "lerp", (i+1)*0.1, num=70)
-        i+=1
-    '''
-    #''' sampling
-    while i < 100:
-        model2.sample_graph(hparams, placeholders, i+hparams.offset, hparams.nodes, hparams.edges)
-        i += 1
+    num_features = features[0].shape[1]
+    lenedges = [len(edge[0]) for edge in edges]
+    lenweight_bin = [len(weight_b[0]) for weight_b in weight_bin]
+    print("Len edges", lenedges, lenweight_bin)
+    print("Num features", num_features)
+    print("Num examples", len(adj))
+    #print("Neg_index", neg_index) 
+    e = max([len(edge) for edge in edges])
+        
+    log_fact_k = log_fact(e)
+    # Training
+    #'''
+    model = VAEG(hparams, placeholders, num_nodes, num_features,log_fact_k, len(adj))
+    model.restore(hparams.out_dir)
+    model.train(placeholders, hparams, adj, weight, weight_bin, features, edges, neg_edges, features1)

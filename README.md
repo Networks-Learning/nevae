@@ -8,13 +8,12 @@ Paper : https://arxiv.org/pdf/1802.05283.pdf
 
 -`networkx 2.0`
 
-## Command to learn model
+## Quick Overview
 
-`python main.py --num_epochs 10 --learning_rate 0.0001 --log_every 5 --z_dim <z> --random_walk <k> --edges <e> --nodes <n> --graph_file <graph> --z_dir <zspace> --sample_file <sampledir> --out_dir <outputdir> >  log.out`
-
-## Command to sample graph
-
-`python sample.py --num_epochs 10 --learning_rate 0.0001 --log_every 5 --z_dim <z> --random_walk <k> --edges <e> --nodes <n> --graph_file <graph> --z_dir <zspace> --sample_file <sample> --out_dir <outputfile> > log.out`
+`nevae` code for the paper : https://aaai.org/ojs/index.php/AAAI/article/view/3903
+`nevae_rl` consists code for property oriented decoding mechanism
 
 
-## For real data please checkout the branch node_label
+## Follow the readme for each folder
+
+
