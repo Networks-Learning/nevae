@@ -1,8 +1,8 @@
-from utils_new import *
+from utils import *
 #create_dir, pickle_save, print_vars, load_data, get_shape, proxy
 from config import SAVE_DIR, VAEGConfig
 from datetime import datetime
-from model_3d import VAEGRL
+from model_3d import VAEG
 
 import tensorflow as tf
 import numpy as np
@@ -126,8 +126,8 @@ if __name__ == '__main__':
     #print compute_cost_energy(weight[0], coord[0], features1[0])
     #'''
     print("Total adj", len(adj)) 
-    model = VAEGRL(hparams, placeholders, hparams.nodes, 4, log_fact_k, len(adj))
-    model.copy_weight(hparams.restore_dir)
-    #model.restore(hparams.out_dir)
+    model = VAEG(hparams, placeholders, hparams.nodes, 4, log_fact_k, len(adj))
+    #model.copy_weight(hparams.restore_dir)
+    model.restore(hparams.out_dir)
     model.train(placeholders, hparams, adj, weight, weight_bin, features, edges, neg_edges, features1, coord)
     #'''

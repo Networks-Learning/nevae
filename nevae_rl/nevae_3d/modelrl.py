@@ -1,5 +1,5 @@
 import tensorflow as tf
-from utils_new import *
+from utils import *
 from config import SAVE_DIR, VAEGConfig
 from cell_3d import VAEGCell
 from rlcell_3d import VAEGRLCell

@@ -1,8 +1,14 @@
-## Instructions to run the code
+## Requirements
 
-# 
-- Please train the original NeVAE model and store the model in a directory
-- Supply the directory as `restore_dir` in the follwing command
+Gaussian09
+
+Please follow the instruction to install Gaussian software:
+
+`https://linuxcluster.wordpress.com/2010/11/30/linux-binary-gaussian-09-installation-instructions/`
+
+## Instructions to train the model
+
+First train the model to learn the 3d coordintaes and store the model in some output folder.
 
 ```
 usage: main.py [-h] [--num_epochs NUM_EPOCHS] [--learning_rate LEARNING_RATE]
@@ -12,9 +18,9 @@ usage: main.py [-h] [--num_epochs NUM_EPOCHS] [--learning_rate LEARNING_RATE]
                [--bin_dim BIN_DIM] [--temperature TEMPERATURE]
                [--synthetic SYNTHETIC] [--graph_file GRAPH_FILE]
                [--z_dir Z_DIR] [--sample SAMPLE] [--mask_weight MASK_WEIGHT]
-               [--out_dir OUT_DIR] [--restore_dir RESTORE_DIR]
                [--neg_sample_size NEG_SAMPLE_SIZE] [--node_sample NODE_SAMPLE]
                [--bfs_sample BFS_SAMPLE] [--E E] [--no_traj NO_TRAJ]
+               [--out_dir OUT_DIR] [--restore_dir RESTORE_DIR]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -46,9 +52,6 @@ optional arguments:
   --sample SAMPLE       True if you want to sample
   --mask_weight MASK_WEIGHT
                         True if you want to mask weight
-  --out_dir OUT_DIR     Store log/model files.
-  --restore_dir RESTORE_DIR
-                        Restore weight values from NeVAE.
   --neg_sample_size NEG_SAMPLE_SIZE
                         number of negative edges to be sampled
   --node_sample NODE_SAMPLE
@@ -57,6 +60,10 @@ optional arguments:
                         number of times bfs to run
   --E E                 number of edges to be fixed
   --no_traj NO_TRAJ     number of trajectories to be sampled
+  --out_dir OUT_DIR     Store log/model files.
+  --restore_dir RESTORE_DIR
+                        Restore weight values from NeVAE.
 ```
 
-- once trained, get the generated molecule and follow nevae_3d instructions for 3d molecule generation
+- To generate a more stable structure use 
+`python main_rl.py` with the `restore_dir` as the previously stored output_dir

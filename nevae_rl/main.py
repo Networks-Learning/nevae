@@ -1,16 +1,11 @@
+import tensorflow as tf
 from utils import *
 #create_dir, pickle_save, print_vars, load_data, get_shape, proxy
-from config import SAVE_DIR, VAEGConfig
-from datetime import datetime
 from modelrl import VAEGRL
-
-import tensorflow as tf
-import numpy as np
+#import tensorflow as tf
 import logging
-import pickle
-import os
 import argparse
-
+import time 
 logging.basicConfig(format="[%(asctime)s] %(message)s", datefmt="%m%d %H:%M:%S")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -23,11 +18,10 @@ placeholders = {
     }
 def add_arguments(parser):
     parser.register("type", "bool", lambda v: v.lower() == "true")
-
     # network
     parser.add_argument("--num_epochs", type=int, default=32, help="Number of epochs")
     parser.add_argument("--learning_rate", type=float, default=0.00005, help="learning rate")
-    parser.add_argument("--decay_rate", type=float, default=1.0, help="decay rate")
+    parser.add_argument("--decay_rate", type=float, default=0.5, help="decay rate")
     parser.add_argument("--dropout_rate", type=float, default=0.00005, help="dropout rate")
     parser.add_argument("--log_every", type=int, default=5, help="write the log in how many iterations")
     parser.add_argument("--sample_file", type=str, default=None, help="directory to store the sample graphs")
@@ -44,17 +38,15 @@ def add_arguments(parser):
     parser.add_argument("--z_dir", type=str, default=None,
                         help="The z values will be stored file to be stored")
     parser.add_argument("--sample", type=bool, default=False, help="True if you want to sample")
+
     parser.add_argument("--mask_weight", type=bool, default=False, help="True if you want to mask weight")
-    parser.add_argument("--neg_sample_size", type=int, default=10, help="number of negative edges to be sampled")
+    parser.add_argument("--out_dir", type=str, default=None, help="Store log/model files.")
+    parser.add_argument("--restore_dir", type=str, default=None, help="Restore weight values from NeVAE.")
+    parser.add_argument("--neg_sample_size", type=int, default=100, help="number of negative edges to be sampled")
     parser.add_argument("--node_sample", type=int, default=1, help="number of nodes to be sampled")
     parser.add_argument("--bfs_sample", type=int, default=1, help="number of times bfs to run")
-    
     parser.add_argument("--E", type=int, default=90, help="number of edges to be fixed")
     parser.add_argument("--no_traj", type=int, default=5, help="number of trajectories to be sampled")
-    
-    parser.add_argument("--out_dir", type=str, default=None,
-                        help="Store log/model files.")
-    parser.add_argument("--restore_dir", type=str, default=None, help="Restore weight values from NeVAE.")
 
 def create_hparams(flags):
   """Create training hparams."""
@@ -75,10 +67,10 @@ def create_hparams(flags):
       random_walk=flags.random_walk,
       log_every=flags.log_every,
       nodes=flags.nodes,
-      bin_dim = flags.bin_dim,
-      mask_weight = flags.mask_weight,
+      bin_dim=flags.bin_dim,
+      mask_weight=flags.mask_weight,
       temperature=flags.temperature,
-      synthetic = flags.synthetic,  
+      synthetic = flags.synthetic,
       
       #sample
       sample=flags.sample,
@@ -87,7 +79,6 @@ def create_hparams(flags):
       bfs_sample=flags.bfs_sample,
       E=flags.E,
       no_traj=flags.no_traj
-
       )
 
 if __name__ == '__main__':
@@ -96,18 +87,34 @@ if __name__ == '__main__':
     FLAGS, unparsed = nmt_parser.parse_known_args()
     hparams = create_hparams(FLAGS)
     
-    adj, weight, weight_bin, features, edges, neg_edges, features1, coord = load_data_from_pkl(hparams)
-
-    e = max([len(edge) for edge in edges])
-    log_fact_k = log_fact(e)
-    # Training
-    #'''
+    # loading the data from a file
+    adj, weight, weight_bin, weight_bin1, features, edges, all_edges, features1, atom_list, smiles = load_data_new(hparams.graph_file, hparams.nodes, hparams.node_sample, hparams.bfs_sample, hparams.bin_dim, hparams.synthetic)
     
-    #print compute_cost_energy(weight[0], coord[0], features1[0])
-    #'''
-    print("Total adj", len(adj)) 
-    model = VAEGRL(hparams, placeholders, hparams.nodes, 4, log_fact_k, len(adj))
-    model.copy_weight(hparams.restore_dir)
-    #model.restore(hparams.out_dir)
-    model.train(placeholders, hparams, adj, weight, weight_bin, features, edges, neg_edges, features1, coord)
+    
+    num_nodes = adj[0].shape[0]
+    num_features = features[0].shape[1]
+    
+    print("Number of elements", len(adj))
+    print("")
+    #print("Num features", num_features, num_nodes, adj[0].shape)
+    
+    e = max([len(edge[0]) for edge in edges])
+    print("e", e, len(all_edges[0]))
+    #print("Adjacency matrix", adj[0])
+    #print("feature1", len(features1[0]))
+    log_fact_k = log_fact(e)
+   
+    print("Debug atom list", atom_list)
+    lambda_n = 35
+    #num_nodes = np.random.poisson(35)
+    num_nodes = 40
+    print "Number of nodes", num_nodes   
+    #''' 
+    model2 = VAEGRL(hparams, placeholders, num_nodes, num_features, log_fact_k, len(adj))
+    #model2.partial_restore(hparams.restore_dir)
+    model2.copy_weight(hparams.restore_dir)
+    #model2.restore(hparams.out_dir)
+
+    #print("Time for preprocessing", end -start)
+    model2.train(placeholders, hparams, adj, weight, weight_bin, weight_bin1, features, edges, all_edges, features1, atom_list)
     #'''
