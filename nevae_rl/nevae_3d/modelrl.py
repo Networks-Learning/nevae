@@ -696,7 +696,7 @@ class VAEGRL(VAEGConfig):
 
                         properties = []	
 		    	for j in range(hparams.no_traj):
-                        	energy = compute_cost_energy(weight[i], coord_samples[j], features1[i])
+                        	energy = compute_cost_energy(args, weight[i], coord_samples[j], features1[i])
                         	#energy_list.append(energy)
                                 #print "energy", energy
                			properties.append(energy) 

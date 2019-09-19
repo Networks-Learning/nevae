@@ -64,8 +64,8 @@ def neighbor(z_coord, weight, z_dim):
 		z_coord_modified.append(np.concatenate((z_i,np.reshape(temp, (1,z_dim))), axis=1))
 	return np.reshape(z_coord_modified, (len(z_coord),2 *z_dim))
 
-def compute_cost_energy(weight, coords, features):
-	filename = "/NL/random-graphs/work/gaussian/data/temp_2.gjf"
+def compute_cost_energy(args, weight, coords, features):
+	filename = args.src_data + "temp_2.gjf"
 	f = open(filename, "w")
 	#f.write(+"\n")
         print "Weriting t file"
@@ -124,7 +124,7 @@ def compute_cost_energy(weight, coords, features):
 		f.write(" "+str(count) + "\n")
         #'''
         f.close()
-        return getenergy("temp_2.gjf")
+        return getenergy("temp_2.gjf", args)
 
 def getenergy(name, args):
         my_env = os.environ.copy()
