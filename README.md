@@ -14,6 +14,6 @@ Paper : https://arxiv.org/pdf/1802.05283.pdf
 `nevae_rl` consists code for property oriented decoding mechanism
 
 
-## Follow the readme for each folder
+## Follow the README of each folder
 
 
