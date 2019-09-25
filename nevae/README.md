@@ -8,6 +8,9 @@
 
 -`networkx 2.0`
 
+## Input preparation
+python convert_to_nx.py <smile_list> <output_folder> 
+
 ## Train model 
 
   `mkdir output_with_mask`
