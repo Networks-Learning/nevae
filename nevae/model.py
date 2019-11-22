@@ -1,4 +1,4 @@
-from utils_new import *
+from utils import *
 from config import SAVE_DIR, VAEGConfig
 from cell import VAEGCell
 from math import log
